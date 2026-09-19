@@ -1,0 +1,80 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Build a Phrase Router rule",
+        "description": "Optionally require a label. Every light carrying it (in whichever area this rule applies to) becomes a target - leave this blank to target every light in that area instead.",
+        "data": {
+          "label_id": "Label (optional)"
+        }
+      },
+      "area_scope": {
+        "title": "Which room does this apply to?",
+        "description": "\"Whichever room heard it\" uses the area of whatever voice satellite/device the phrase was spoken to - walk into a room and say it, and it targets that room automatically.",
+        "data": {
+          "area_scope": "Area scope"
+        }
+      },
+      "fixed_area": {
+        "title": "Pick the room",
+        "data": {
+          "fixed_area": "Room"
+        }
+      },
+      "wordings": {
+        "title": "Phrases",
+        "description": "Comma-separated. \"Toggle\" is required and is what runs if neither of the others match. \"On\"/\"Off\" are optional explicit wordings.",
+        "data": {
+          "toggle": "Toggle wording(s)",
+          "turn_on": "Explicit \"on\" wording(s) (optional)",
+          "turn_off": "Explicit \"off\" wording(s) (optional)"
+        }
+      },
+      "name": {
+        "title": "Name this rule",
+        "description": "Suggested from the label and room you picked - type your own if you'd rather.",
+        "data": {
+          "name": "Name"
+        }
+      }
+    },
+    "error": {
+      "toggle_required": "Enter at least one toggle wording."
+    }
+  },
+  "options": {
+    "step": {
+      "label": {
+        "title": "Phrase Router options",
+        "description": "Optionally require a label.",
+        "data": {
+          "label_id": "Label (optional)"
+        }
+      },
+      "area_scope": {
+        "title": "Which room does this apply to?",
+        "data": {
+          "area_scope": "Area scope"
+        }
+      },
+      "fixed_area": {
+        "title": "Pick the room",
+        "data": {
+          "fixed_area": "Room"
+        }
+      },
+      "wordings": {
+        "title": "Phrases",
+        "description": "Comma-separated. \"Toggle\" is required.",
+        "data": {
+          "toggle": "Toggle wording(s)",
+          "turn_on": "Explicit \"on\" wording(s) (optional)",
+          "turn_off": "Explicit \"off\" wording(s) (optional)"
+        }
+      }
+    },
+    "error": {
+      "toggle_required": "Enter at least one toggle wording."
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "domain": "phrase_router",
+  "name": "Phrase Router",
+  "codeowners": ["@drmogie"],
+  "config_flow": true,
+  "documentation": "https://github.com/drmogie/ha-phrase-router",
+  "issue_tracker": "https://github.com/drmogie/ha-phrase-router/issues",
+  "integration_type": "device",
+  "iot_class": "local_push",
+  "requirements": [],
+  "version": "2026.09.19.01"
+}
