@@ -14,9 +14,13 @@ keep in sync.
 Target resolution (which light entities a rule actually controls) is a
 plain entity_registry/device_registry/area_registry scan - the domain
 check and label check deliberately mirror Label Master Control's own
-aggregator.py (a flat `label_id in entity_entry.labels` check, no
-inheritance from a device's or area's own labels), so both integrations
-agree on what "carries this label" means.
+aggregator.py (a subset/AND check against entity_entry.labels - an
+entity must carry every label the rule requires, no inheritance from a
+device's or area's own labels), so both integrations agree on what
+"carries these labels" means. A rule with no labels at all matches
+every light in the resolved area, same as before; this now also
+accepts more than one label, requiring all of them together rather
+than any one of them.
 """
 from __future__ import annotations
 
@@ -61,17 +65,32 @@ def _resolve_device_area(hass: HomeAssistant, device_id: str | None) -> str | No
     return device_entry.area_id if device_entry else None
 
 
+def _normalize_label_ids(raw: Any) -> frozenset[str]:
+    """Accept a pre-multi-label entry's single string, a list, or nothing.
+
+    Old entries stored one label as a bare string under CONF_LABEL_ID;
+    the LabelSelector now returns a list. Both read the same way from
+    here on, so no migration of stored entries is needed.
+    """
+    if not raw:
+        return frozenset()
+    if isinstance(raw, str):
+        return frozenset({raw})
+    return frozenset(raw)
+
+
 def _resolve_targets(
-    hass: HomeAssistant, area_id: str | None, label_id: str | None
+    hass: HomeAssistant, area_id: str | None, label_ids: frozenset[str]
 ) -> list[str]:
-    """Every TARGET_DOMAIN entity carrying label_id (or all, if no label
-    filter) within area_id - or house-wide, if area_id is None."""
+    """Every TARGET_DOMAIN entity carrying all of label_ids (or all
+    entities, if label_ids is empty) within area_id - or house-wide, if
+    area_id is None."""
     registry = er.async_get(hass)
     targets = []
     for entity_entry in registry.entities.values():
         if entity_entry.entity_id.split(".", 1)[0] != TARGET_DOMAIN:
             continue
-        if label_id and label_id not in entity_entry.labels:
+        if label_ids and not label_ids.issubset(entity_entry.labels):
             continue
         if area_id is not None and _effective_area_id(hass, entity_entry) != area_id:
             continue
@@ -82,7 +101,7 @@ def _resolve_targets(
 def async_register_rule(hass: HomeAssistant, entry) -> list[CALLBACK_TYPE]:
     """Register one sentence trigger per non-empty wording bucket on this rule."""
     data: dict[str, Any] = entry.options if entry.options else entry.data
-    label_id = data.get(CONF_LABEL_ID)
+    label_ids = _normalize_label_ids(data.get(CONF_LABEL_ID))
     area_scope = data[CONF_AREA_SCOPE]
     fixed_area = data.get(CONF_FIXED_AREA)
     wordings = data.get(CONF_WORDINGS, {})
@@ -124,7 +143,7 @@ def async_register_rule(hass: HomeAssistant, entry) -> list[CALLBACK_TYPE]:
                     )
                     return "I'm not sure which room that was."
 
-            targets = _resolve_targets(hass, area_id, label_id)
+            targets = _resolve_targets(hass, area_id, label_ids)
             if not targets:
                 _LOGGER.debug(
                     "Phrase Router: '%s' matched '%s' but found no lights to %s",

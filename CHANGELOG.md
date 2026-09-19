@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026.09.19.02 - Multiple labels per rule
+
+- The label picker now accepts more than one label. A light must carry **all** of the labels you pick to match (same subset/AND rule Label Master Control uses for its own multi-label devices) - not just any one of them.
+- Existing rules with a single label keep working unchanged; nothing needs to be redone.
+
 ## 2026.09.19.01 - Initial release
 
 First version, built in-chat from a design conversation (schema and architecture worked out step by step - see the project's own notes for the full reasoning trail). Light domain only.

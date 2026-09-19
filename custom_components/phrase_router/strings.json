@@ -3,9 +3,9 @@
     "step": {
       "user": {
         "title": "Build a Phrase Router rule",
-        "description": "Optionally require a label. Every light carrying it (in whichever area this rule applies to) becomes a target - leave this blank to target every light in that area instead.",
+        "description": "Optionally require one or more labels. Every light carrying all of them (in whichever area this rule applies to) becomes a target - leave this blank to target every light in that area instead.",
         "data": {
-          "label_id": "Label (optional)"
+          "label_id": "Label(s) (optional)"
         }
       },
       "area_scope": {
@@ -46,9 +46,9 @@
     "step": {
       "label": {
         "title": "Phrase Router options",
-        "description": "Optionally require a label.",
+        "description": "Optionally require one or more labels.",
         "data": {
-          "label_id": "Label (optional)"
+          "label_id": "Label(s) (optional)"
         }
       },
       "area_scope": {

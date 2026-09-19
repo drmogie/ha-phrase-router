@@ -14,7 +14,7 @@ Each rule you build is its own device under this integration - nothing is writte
 
 Each rule has:
 
-- **Label (optional).** Every light carrying this label becomes a target. Leave it blank to target every light in the resolved room instead.
+- **Label(s) (optional).** Every light carrying *all* of the labels you pick becomes a target. Leave it blank to target every light in the resolved room instead.
 - **Area scope.** *Whichever room heard it* (the room of the satellite/device that heard the phrase - this is the "walk in and say it" behavior), *always one specific room* (pick a fixed room regardless of where it's said), or *whole house* (no room filtering at all).
 - **Wordings.** A required **toggle** phrase (or several, comma-separated) that flips the matched lights' state, plus optional explicit **on** and **off** phrases that always do that instead of toggling.
 

@@ -3,8 +3,9 @@
 A wizard, same shape as Label Master Control's own "pick label(s), then
 name it" flow, adapted for one voice-phrase rule instead of one
 aggregate control device:
-  1. async_step_user - optionally pick a label. Leave it blank to match
-     every light in the resolved area, no label filter at all.
+  1. async_step_user - optionally pick one or more labels (a light must
+     carry all of them to match). Leave it blank to match every light
+     in the resolved area, no label filter at all.
   2. async_step_area_scope - which room a phrase said under this rule
      applies to: whichever room the satellite that heard it belongs to,
      one fixed room always, or the whole house.
@@ -110,12 +111,16 @@ def _parse_wordings(user_input: dict[str, Any]) -> tuple[dict[str, list[str]], d
 
 
 def _suggested_name(
-    hass, label_id: str | None, area_scope: str, fixed_area: str | None
+    hass, label_ids: list[str] | None, area_scope: str, fixed_area: str | None
 ) -> str:
     bits = ["Lights"]
-    if label_id:
-        label = lr.async_get(hass).async_get_label(label_id)
-        bits.append(f"({label.name if label else label_id})")
+    if label_ids:
+        registry = lr.async_get(hass)
+        names = [
+            (label.name if (label := registry.async_get_label(lid)) else lid)
+            for lid in label_ids
+        ]
+        bits.append(f"({', '.join(names)})")
     if area_scope == AREA_SCOPE_FIXED and fixed_area:
         area = ar.async_get(hass).async_get_area(fixed_area)
         bits.append(f"— {area.name if area else fixed_area}")
@@ -141,7 +146,7 @@ class PhraseRouterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return await self.async_step_area_scope()
 
         schema = vol.Schema(
-            {vol.Optional(CONF_LABEL_ID): LabelSelector(LabelSelectorConfig(multiple=False))}
+            {vol.Optional(CONF_LABEL_ID): LabelSelector(LabelSelectorConfig(multiple=True))}
         )
         return self.async_show_form(step_id="user", data_schema=schema)
 
@@ -236,11 +241,17 @@ class PhraseRouterOptionsFlow(config_entries.OptionsFlow):
             self._data[CONF_LABEL_ID] = user_input.get(CONF_LABEL_ID)
             return await self.async_step_area_scope()
 
+        # A pre-multi-label entry stored one label as a bare string; the
+        # LabelSelector now needs a list default regardless of how it was
+        # originally saved.
+        current_labels = self._data.get(CONF_LABEL_ID)
+        if isinstance(current_labels, str):
+            current_labels = [current_labels]
         schema = vol.Schema(
             {
                 vol.Optional(
-                    CONF_LABEL_ID, default=self._data.get(CONF_LABEL_ID)
-                ): LabelSelector(LabelSelectorConfig(multiple=False))
+                    CONF_LABEL_ID, default=current_labels
+                ): LabelSelector(LabelSelectorConfig(multiple=True))
             }
         )
         return self.async_show_form(step_id="label", data_schema=schema)
