@@ -1,30 +1,36 @@
 """Config flow for Phrase Router.
 
-A wizard, same shape as Label Master Control's own "pick label(s), then
-name it" flow, adapted for one voice-phrase rule instead of one
-aggregate control device:
-  1. async_step_user - pick the domain this rule controls (light, fan,
-     or switch - all three share the same toggle/on/off services), and
-     optionally one or more labels (an entity must carry all of them to
-     match). Leave the label field blank to match every entity of that
-     domain in the resolved area, no label filter at all.
-  2. async_step_area_scope - which room a phrase said under this rule
-     applies to: whichever room the satellite that heard it belongs to,
-     one fixed room always, or the whole house.
-  3. async_step_fixed_area - only shown when area_scope is "fixed".
-  4. async_step_wordings - the phrases themselves: a required "toggle"
-     wording, optional explicit "on"/"off" wordings, and four
-     independent optional custom responses - success and error shown
-     directly (fail sits right under success, since those are the two
-     outcomes people actually customize), with the less-common
-     not-found/unknown-room pair tucked into a collapsed "More
-     responses" section.
-  5. async_step_name - name the rule.
+One page, four sections, then a name:
+  1. async_step_user - everything at once, grouped into expandable
+     sections instead of separate wizard screens:
+       - "What to control" - domain (light/fan/switch) and optional
+         label(s).
+       - "Where" - area scope (whichever room heard it / one fixed
+         room / whole house) and the room to use when scope is
+         "fixed" (shown here always, but only read back when it's
+         actually needed).
+       - "Phrases" - the required "toggle" wording, optional explicit
+         "on"/"off" wordings, and the two most-customized responses
+         (success, error).
+       - "More responses" - the less-common not-found/unknown-room
+         responses, collapsed by default. This is its own top-level
+         section rather than nested inside "Phrases" because Home
+         Assistant only allows one level of sections - a section can't
+         contain another section - but coming straight after Phrases,
+         it still reads as a continuation of it.
+  2. async_step_name - name the rule (kept separate since the
+     suggested name is computed from what was just picked above).
 
-Its "Configure" option replays the domain/label/area/wordings steps so
-an existing rule's targeting or phrases can change without rebuilding
-it. An entry built before the domain field existed has nothing stored
-under CONF_DOMAIN and falls back to "light" (see
+Its "Configure" option (async_step_init) shows the exact same one-page
+form pre-filled from the existing rule, so its targeting or phrases can
+change without rebuilding it - and, importantly, so any of those
+optional fields can be cleared back to blank: they're pre-filled via
+description={"suggested_value": ...} rather than a schema default,
+because a default doubles as the fallback whenever the submitted value
+looks empty, not just when the field was never touched - which would
+otherwise make emptying a field and saving silently bring the old
+value right back. An entry built before the domain field existed has
+nothing stored under CONF_DOMAIN and falls back to "light" (see
 const.DEFAULT_TARGET_DOMAIN) - the domain it always meant, back when
 light was the only option.
 """
@@ -53,14 +59,17 @@ from .const import (
     AREA_SCOPE_DEVICE,
     AREA_SCOPE_FIXED,
     CONF_AREA_SCOPE,
+    CONF_AREA_SECTION,
     CONF_DOMAIN,
     CONF_FIXED_AREA,
     CONF_LABEL_ID,
+    CONF_PHRASES_SECTION,
     CONF_RESPONSE,
     CONF_RESPONSE_ERROR,
     CONF_RESPONSE_NOT_FOUND,
     CONF_RESPONSE_UNKNOWN_ROOM,
     CONF_RESPONSES_SECTION,
+    CONF_TARGETING_SECTION,
     CONF_WORDINGS,
     DEFAULT_TARGET_DOMAIN,
     DOMAIN,
@@ -104,64 +113,103 @@ def _join_phrases(phrases: list[str] | None) -> str:
     return ", ".join(phrases or [])
 
 
-# The four independent optional per-outcome response fields, in the
-# order they're shown in the wordings step.
-_RESPONSE_FIELDS = (
-    CONF_RESPONSE,
-    CONF_RESPONSE_NOT_FOUND,
-    CONF_RESPONSE_UNKNOWN_ROOM,
-    CONF_RESPONSE_ERROR,
-)
+def _settings_schema(current: dict[str, Any]) -> vol.Schema:
+    """The whole one-page form, pre-filled from `current` (empty for a
+    brand-new rule, an existing rule's flat data dict for Configure).
 
+    Every optional field is pre-filled with description={"suggested_value":
+    ...} rather than default=... - see the module docstring for why that
+    distinction matters here. The two Required selects (domain, area
+    scope) and the Required toggle wording keep default=..., since those
+    can never be legitimately blank anyway.
+    """
+    current_labels = current.get(CONF_LABEL_ID)
+    if isinstance(current_labels, str):
+        # A pre-multi-label entry stored one label as a bare string; the
+        # LabelSelector always wants a list.
+        current_labels = [current_labels]
+    current_domain = current.get(CONF_DOMAIN, DEFAULT_TARGET_DOMAIN)
+    current_scope = current.get(CONF_AREA_SCOPE, AREA_SCOPE_DEVICE)
+    current_fixed_area = current.get(CONF_FIXED_AREA)
+    wordings = current.get(CONF_WORDINGS, {})
 
-def _wordings_schema(
-    current: dict[str, list[str]],
-    current_responses: dict[str, str | None] | None = None,
-) -> vol.Schema:
-    # Every field below except the required toggle uses
-    # description={"suggested_value": ...} rather than default=... on
-    # purpose - a schema default doubles as the fallback whenever the
-    # submitted value looks empty, which silently undoes clearing a
-    # previously-set optional field back to blank. suggested_value
-    # pre-fills the same way but actually lets it be cleared.
-    current_responses = current_responses or {}
     return vol.Schema(
         {
-            vol.Required(
-                WORDING_TOGGLE, default=_join_phrases(current.get(WORDING_TOGGLE))
-            ): str,
-            vol.Optional(
-                WORDING_TURN_ON,
-                description={
-                    "suggested_value": _join_phrases(current.get(WORDING_TURN_ON))
-                },
-            ): str,
-            vol.Optional(
-                WORDING_TURN_OFF,
-                description={
-                    "suggested_value": _join_phrases(current.get(WORDING_TURN_OFF))
-                },
-            ): str,
-            vol.Optional(
-                CONF_RESPONSE,
-                description={
-                    "suggested_value": current_responses.get(CONF_RESPONSE) or ""
-                },
-            ): str,
-            vol.Optional(
-                CONF_RESPONSE_ERROR,
-                description={
-                    "suggested_value": current_responses.get(CONF_RESPONSE_ERROR)
-                    or ""
-                },
-            ): str,
+            vol.Required(CONF_TARGETING_SECTION): section(
+                vol.Schema(
+                    {
+                        vol.Required(
+                            CONF_DOMAIN, default=current_domain
+                        ): _domain_selector(),
+                        vol.Optional(
+                            CONF_LABEL_ID,
+                            description={"suggested_value": current_labels},
+                        ): LabelSelector(LabelSelectorConfig(multiple=True)),
+                    }
+                ),
+                {"collapsed": False},
+            ),
+            vol.Required(CONF_AREA_SECTION): section(
+                vol.Schema(
+                    {
+                        vol.Required(
+                            CONF_AREA_SCOPE, default=current_scope
+                        ): _area_scope_selector(current_scope),
+                        vol.Optional(
+                            CONF_FIXED_AREA,
+                            description={"suggested_value": current_fixed_area},
+                        ): AreaSelector(),
+                    }
+                ),
+                {"collapsed": False},
+            ),
+            vol.Required(CONF_PHRASES_SECTION): section(
+                vol.Schema(
+                    {
+                        vol.Required(
+                            WORDING_TOGGLE,
+                            default=_join_phrases(wordings.get(WORDING_TOGGLE)),
+                        ): str,
+                        vol.Optional(
+                            WORDING_TURN_ON,
+                            description={
+                                "suggested_value": _join_phrases(
+                                    wordings.get(WORDING_TURN_ON)
+                                )
+                            },
+                        ): str,
+                        vol.Optional(
+                            WORDING_TURN_OFF,
+                            description={
+                                "suggested_value": _join_phrases(
+                                    wordings.get(WORDING_TURN_OFF)
+                                )
+                            },
+                        ): str,
+                        vol.Optional(
+                            CONF_RESPONSE,
+                            description={
+                                "suggested_value": current.get(CONF_RESPONSE) or ""
+                            },
+                        ): str,
+                        vol.Optional(
+                            CONF_RESPONSE_ERROR,
+                            description={
+                                "suggested_value": current.get(CONF_RESPONSE_ERROR)
+                                or ""
+                            },
+                        ): str,
+                    }
+                ),
+                {"collapsed": False},
+            ),
             vol.Optional(CONF_RESPONSES_SECTION): section(
                 vol.Schema(
                     {
                         vol.Optional(
                             CONF_RESPONSE_NOT_FOUND,
                             description={
-                                "suggested_value": current_responses.get(
+                                "suggested_value": current.get(
                                     CONF_RESPONSE_NOT_FOUND
                                 )
                                 or ""
@@ -170,7 +218,7 @@ def _wordings_schema(
                         vol.Optional(
                             CONF_RESPONSE_UNKNOWN_ROOM,
                             description={
-                                "suggested_value": current_responses.get(
+                                "suggested_value": current.get(
                                     CONF_RESPONSE_UNKNOWN_ROOM
                                 )
                                 or ""
@@ -184,38 +232,50 @@ def _wordings_schema(
     )
 
 
-def _parse_wordings(user_input: dict[str, Any]) -> tuple[dict[str, list[str]], dict[str, str]]:
-    errors: dict[str, str] = {}
-    toggle = _split_phrases(user_input.get(WORDING_TOGGLE))
-    if not toggle:
-        errors[WORDING_TOGGLE] = "toggle_required"
-        return {}, errors
-    return (
-        {
-            WORDING_TOGGLE: toggle,
-            WORDING_TURN_ON: _split_phrases(user_input.get(WORDING_TURN_ON)),
-            WORDING_TURN_OFF: _split_phrases(user_input.get(WORDING_TURN_OFF)),
-        },
-        errors,
-    )
+def _parse_settings(user_input: dict[str, Any]) -> tuple[dict[str, Any], dict[str, str]]:
+    """Pull every field back out of its section and flatten it onto one
+    flat dict, using the same CONF_* keys triggers.py already reads -
+    nothing outside this file ever needs to know sections exist.
 
-
-def _store_responses(data: dict[str, Any], user_input: dict[str, Any]) -> None:
-    """Pull all four response fields out of user_input and into data.
-
-    Success and error come straight off the top level; not-found and
-    unknown-room arrive nested under CONF_RESPONSES_SECTION (that's how
-    HA's collapsible "section" schema submits its fields) and get
-    flattened back onto the same flat keys triggers.py already reads -
-    it never needs to know the section exists.
+    Always returns a best-effort `data` dict even when `errors` is
+    non-empty, so the caller can redisplay the form pre-filled with
+    exactly what the user just typed instead of resetting everything -
+    only commit `data` once `errors` comes back empty.
     """
-    data[CONF_RESPONSE] = user_input.get(CONF_RESPONSE) or None
-    data[CONF_RESPONSE_ERROR] = user_input.get(CONF_RESPONSE_ERROR) or None
-    advanced = user_input.get(CONF_RESPONSES_SECTION) or {}
-    data[CONF_RESPONSE_NOT_FOUND] = advanced.get(CONF_RESPONSE_NOT_FOUND) or None
-    data[CONF_RESPONSE_UNKNOWN_ROOM] = (
-        advanced.get(CONF_RESPONSE_UNKNOWN_ROOM) or None
-    )
+    errors: dict[str, str] = {}
+    targeting = user_input.get(CONF_TARGETING_SECTION) or {}
+    area = user_input.get(CONF_AREA_SECTION) or {}
+    phrases = user_input.get(CONF_PHRASES_SECTION) or {}
+    more_responses = user_input.get(CONF_RESPONSES_SECTION) or {}
+
+    area_scope = area.get(CONF_AREA_SCOPE) or AREA_SCOPE_DEVICE
+    fixed_area = area.get(CONF_FIXED_AREA)
+    if area_scope == AREA_SCOPE_FIXED and not fixed_area:
+        errors[f"{CONF_AREA_SECTION}.{CONF_FIXED_AREA}"] = "fixed_area_required"
+
+    toggle = _split_phrases(phrases.get(WORDING_TOGGLE))
+    if not toggle:
+        errors[f"{CONF_PHRASES_SECTION}.{WORDING_TOGGLE}"] = "toggle_required"
+
+    data: dict[str, Any] = {
+        CONF_DOMAIN: targeting.get(CONF_DOMAIN, DEFAULT_TARGET_DOMAIN),
+        CONF_LABEL_ID: targeting.get(CONF_LABEL_ID),
+        CONF_AREA_SCOPE: area_scope,
+        # Only kept when it's actually meaningful, same as the old
+        # separate fixed_area step used to guarantee.
+        CONF_FIXED_AREA: fixed_area if area_scope == AREA_SCOPE_FIXED else None,
+        CONF_WORDINGS: {
+            WORDING_TOGGLE: toggle,
+            WORDING_TURN_ON: _split_phrases(phrases.get(WORDING_TURN_ON)),
+            WORDING_TURN_OFF: _split_phrases(phrases.get(WORDING_TURN_OFF)),
+        },
+        CONF_RESPONSE: phrases.get(CONF_RESPONSE) or None,
+        CONF_RESPONSE_ERROR: phrases.get(CONF_RESPONSE_ERROR) or None,
+        CONF_RESPONSE_NOT_FOUND: more_responses.get(CONF_RESPONSE_NOT_FOUND) or None,
+        CONF_RESPONSE_UNKNOWN_ROOM: more_responses.get(CONF_RESPONSE_UNKNOWN_ROOM)
+        or None,
+    }
+    return data, errors
 
 
 def _suggested_name(
@@ -242,7 +302,7 @@ def _suggested_name(
 
 
 class PhraseRouterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Build one voice-phrase rule: domain, label, area scope, wordings, name."""
+    """Build one voice-phrase rule: one settings page, then a name."""
 
     VERSION = 1
 
@@ -252,66 +312,18 @@ class PhraseRouterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Pick the domain this rule controls, and optionally a label to filter targets by."""
+        """Everything but the name, on one page of expandable sections."""
+        errors: dict[str, str] = {}
+        current = self._data
         if user_input is not None:
-            self._data[CONF_DOMAIN] = user_input[CONF_DOMAIN]
-            self._data[CONF_LABEL_ID] = user_input.get(CONF_LABEL_ID)
-            return await self.async_step_area_scope()
-
-        schema = vol.Schema(
-            {
-                vol.Required(CONF_DOMAIN, default=DEFAULT_TARGET_DOMAIN): _domain_selector(),
-                vol.Optional(CONF_LABEL_ID): LabelSelector(LabelSelectorConfig(multiple=True)),
-            }
-        )
-        return self.async_show_form(step_id="user", data_schema=schema)
-
-    async def async_step_area_scope(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Pick which room(s) this rule applies to."""
-        if user_input is not None:
-            self._data[CONF_AREA_SCOPE] = user_input[CONF_AREA_SCOPE]
-            if user_input[CONF_AREA_SCOPE] == AREA_SCOPE_FIXED:
-                return await self.async_step_fixed_area()
-            self._data[CONF_FIXED_AREA] = None
-            return await self.async_step_wordings()
-
-        schema = vol.Schema(
-            {
-                vol.Required(
-                    CONF_AREA_SCOPE, default=AREA_SCOPE_DEVICE
-                ): _area_scope_selector(AREA_SCOPE_DEVICE)
-            }
-        )
-        return self.async_show_form(step_id="area_scope", data_schema=schema)
-
-    async def async_step_fixed_area(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Only shown when area_scope is 'fixed' - pick the one room."""
-        if user_input is not None:
-            self._data[CONF_FIXED_AREA] = user_input[CONF_FIXED_AREA]
-            return await self.async_step_wordings()
-
-        schema = vol.Schema({vol.Required(CONF_FIXED_AREA): AreaSelector()})
-        return self.async_show_form(step_id="fixed_area", data_schema=schema)
-
-    async def async_step_wordings(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """The phrases: required toggle, optional explicit on/off, optional response."""
-        if user_input is not None:
-            wordings, errors = _parse_wordings(user_input)
+            data, errors = _parse_settings(user_input)
             if not errors:
-                self._data[CONF_WORDINGS] = wordings
-                _store_responses(self._data, user_input)
+                self._data = data
                 return await self.async_step_name()
-        else:
-            errors = {}
+            current = data
 
         return self.async_show_form(
-            step_id="wordings", data_schema=_wordings_schema({}), errors=errors
+            step_id="user", data_schema=_settings_schema(current), errors=errors
         )
 
     async def async_step_name(
@@ -340,7 +352,7 @@ class PhraseRouterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 
 class PhraseRouterOptionsFlow(config_entries.OptionsFlow):
-    """Replay domain / label / area-scope / wordings so an existing rule can change."""
+    """Replay the one-page settings form so an existing rule can change."""
 
     def __init__(self) -> None:
         self._data: dict[str, Any] = {}
@@ -348,90 +360,19 @@ class PhraseRouterOptionsFlow(config_entries.OptionsFlow):
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        entry = self.config_entry
-        self._data = dict(entry.options) if entry.options else dict(entry.data)
-        return await self.async_step_label()
+        if not self._data:
+            entry = self.config_entry
+            self._data = dict(entry.options) if entry.options else dict(entry.data)
 
-    async def async_step_label(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+        errors: dict[str, str] = {}
+        current = self._data
         if user_input is not None:
-            self._data[CONF_DOMAIN] = user_input[CONF_DOMAIN]
-            self._data[CONF_LABEL_ID] = user_input.get(CONF_LABEL_ID)
-            return await self.async_step_area_scope()
-
-        # A pre-multi-label entry stored one label as a bare string; the
-        # LabelSelector now needs a list default regardless of how it was
-        # originally saved. A pre-domain entry has nothing stored under
-        # CONF_DOMAIN at all - it was always "light".
-        current_labels = self._data.get(CONF_LABEL_ID)
-        if isinstance(current_labels, str):
-            current_labels = [current_labels]
-        current_domain = self._data.get(CONF_DOMAIN, DEFAULT_TARGET_DOMAIN)
-        schema = vol.Schema(
-            {
-                vol.Required(CONF_DOMAIN, default=current_domain): _domain_selector(),
-                vol.Optional(
-                    CONF_LABEL_ID,
-                    description={"suggested_value": current_labels},
-                ): LabelSelector(LabelSelectorConfig(multiple=True)),
-            }
-        )
-        return self.async_show_form(step_id="label", data_schema=schema)
-
-    async def async_step_area_scope(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        if user_input is not None:
-            self._data[CONF_AREA_SCOPE] = user_input[CONF_AREA_SCOPE]
-            if user_input[CONF_AREA_SCOPE] == AREA_SCOPE_FIXED:
-                return await self.async_step_fixed_area()
-            self._data[CONF_FIXED_AREA] = None
-            return await self.async_step_wordings()
-
-        current_scope = self._data.get(CONF_AREA_SCOPE, AREA_SCOPE_DEVICE)
-        schema = vol.Schema(
-            {
-                vol.Required(
-                    CONF_AREA_SCOPE, default=current_scope
-                ): _area_scope_selector(current_scope)
-            }
-        )
-        return self.async_show_form(step_id="area_scope", data_schema=schema)
-
-    async def async_step_fixed_area(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        if user_input is not None:
-            self._data[CONF_FIXED_AREA] = user_input[CONF_FIXED_AREA]
-            return await self.async_step_wordings()
-
-        schema = vol.Schema(
-            {
-                vol.Required(
-                    CONF_FIXED_AREA, default=self._data.get(CONF_FIXED_AREA)
-                ): AreaSelector()
-            }
-        )
-        return self.async_show_form(step_id="fixed_area", data_schema=schema)
-
-    async def async_step_wordings(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        current = self._data.get(CONF_WORDINGS, {})
-        if user_input is not None:
-            wordings, errors = _parse_wordings(user_input)
+            data, errors = _parse_settings(user_input)
             if not errors:
-                self._data[CONF_WORDINGS] = wordings
-                _store_responses(self._data, user_input)
+                self._data = data
                 return self.async_create_entry(title="", data=self._data)
-        else:
-            errors = {}
+            current = data
 
         return self.async_show_form(
-            step_id="wordings",
-            data_schema=_wordings_schema(
-                current, {field: self._data.get(field) for field in _RESPONSE_FIELDS}
-            ),
-            errors=errors,
+            step_id="init", data_schema=_settings_schema(current), errors=errors
         )

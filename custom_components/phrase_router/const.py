@@ -14,11 +14,21 @@ CONF_RESPONSE_NOT_FOUND = "response_not_found"
 CONF_RESPONSE_UNKNOWN_ROOM = "response_unknown_room"
 CONF_RESPONSE_ERROR = "response_error"
 
-# Form-only key for the collapsed "more responses" section in the wordings
-# step - the not-found and unknown-room fields live inside it. Never
-# stored itself; its two sub-fields get flattened back to
-# CONF_RESPONSE_NOT_FOUND / CONF_RESPONSE_UNKNOWN_ROOM before saving, so
-# nothing else in the integration needs to know this section exists.
+# Form-only section keys for the single-page settings form (used by both
+# the initial wizard and the Configure options - see config_flow.py).
+# None of these are ever stored themselves: each section's fields get
+# read out of user_input (nested under the section key, same as Home
+# Assistant submits any "section" schema) and flattened back onto the
+# same flat CONF_* keys this file already defines, so nothing outside
+# config_flow.py needs to know sections exist at all.
+#
+# "More responses" reads, visually, as a continuation of "Phrases"
+# right above it, but it's its own top-level section rather than nested
+# inside Phrases - Home Assistant only allows one level of sections, so
+# a section can't contain another one.
+CONF_TARGETING_SECTION = "targeting"
+CONF_AREA_SECTION = "area"
+CONF_PHRASES_SECTION = "phrases"
 CONF_RESPONSES_SECTION = "more_responses"
 
 # The "couldn't tell which room" reply when a rule leaves

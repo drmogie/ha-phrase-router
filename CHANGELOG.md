@@ -1,3 +1,10 @@
+## 2026.09.19.07 - One settings page instead of a click-through wizard
+
+- Building or editing a rule is now one page with four expandable sections - **What to control** (domain, labels), **Where** (area scope, room), **Phrases** (wordings, response on success, response when the action fails), and **More responses** (the less-common not-found/unknown-room pair, collapsed by default) - instead of clicking through separate screens for each.
+- The Configure option is the same page, pre-filled, instead of replaying four steps in sequence.
+- "More responses" is its own top-level section rather than nested inside "Phrases" - Home Assistant only allows one level of sections - but sitting right after Phrases, it still reads as part of it.
+- No stored data changed - existing rules load into the new page exactly as they were.
+
 ## 2026.09.19.06 - Fix: optional fields wouldn't clear back to blank
 
 - Fixed a bug where a previously-set optional field - either explicit on/off wording, any of the four responses, or the label filter - couldn't be cleared back to blank/none through the Configure options. Emptying the field and saving would silently bring the old value right back. This was Home Assistant's own well-documented `default=` quirk (a schema default doubles as the fallback for anything that looks empty, not just an untouched field) - fixed by switching those fields to `suggested_value`, which pre-fills the same way but actually lets you clear it.
