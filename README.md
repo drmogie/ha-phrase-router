@@ -12,12 +12,12 @@ Each rule you build is its own device under this integration - nothing is writte
 
 ## What a rule is
 
-Building or editing a rule is one page, organized into expandable sections rather than a click-through wizard:
+**Building** a new rule walks through separate screens, one topic at a time. **Editing** an existing rule (its **Configure** option) is different on purpose: one page with the same topics as expandable sections, so you're not clicking back through steps you don't need to touch just to change the one thing you came for. Either way, a rule has:
 
 - **What to control.** **Domain** - lights, fans, or switches; all three share the same toggle/on/off behavior, so this is the only thing that changes what a rule can reach, and a rule only ever targets one domain. **Label(s) (optional)** - every entity of that domain carrying *all* of the labels you pick becomes a target; leave it blank to target every entity of that domain in the resolved room instead.
 - **Where.** **Area scope** - *whichever room heard it* (the room of the satellite/device that heard the phrase - the "walk in and say it" behavior), *always one specific room*, or *whole house*. **Room** sits right below it but only matters when area scope is set to "always one specific room" - it's ignored otherwise.
 - **Phrases.** A required **toggle** phrase (or several, comma-separated) that flips the matched entities' state, optional explicit **on** and **off** phrases that always do that instead of toggling, and two of the four custom responses: **response on success** (blank keeps Assist's own default reply) and **response when the action fails** (blank lets the error propagate normally) - these are the two most people actually customize.
-- **More responses**, collapsed by default since these two are rarely needed: **response when nothing matched** (used when the domain/label filter found no entities to act on; blank stays silent) and **response when the room can't be resolved** (used for a "whichever room heard it" rule when the calling device has no area; blank falls back to the built-in "I'm not sure which room that was."). It's its own section rather than nested inside Phrases because Home Assistant only allows one level of sections - but it sits right after Phrases, so it still reads as part of it.
+- **More responses** - **response when nothing matched** (used when the domain/label filter found no entities to act on; blank stays silent) and **response when the room can't be resolved** (used for a "whichever room heard it" rule when the calling device has no area; blank falls back to the built-in "I'm not sure which room that was."). On the Configure page these two are collapsed by default, in their own section right after Phrases (Home Assistant only allows one level of sections, so it can't nest inside Phrases itself); when building a new rule, they're inside the same collapsed section on the Phrases screen.
 
 None of the four responses change what actually happens - they only override what's said back. Every optional field, including the label filter, can be cleared back to blank later through **Configure** - emptying it and saving actually removes it rather than silently keeping the old value.
 
@@ -33,7 +33,7 @@ Copy `custom_components/phrase_router` into your Home Assistant `config/custom_c
 
 ## Setup
 
-Settings → Devices & services → Add integration → **Phrase Router**. Each time you add it, you're building one rule on a single settings page (see "What a rule is" above), then naming it. To add another rule, add the integration again. To change an existing rule, use its **Configure** option - it's the exact same page, pre-filled.
+Settings → Devices & services → Add integration → **Phrase Router**. Each time you add it, you're building one rule through a short wizard (see "What a rule is" above), then naming it. To add another rule, add the integration again. To change an existing rule, use its **Configure** option - the same topics, but as one page of expandable sections instead of separate screens.
 
 ## Current limitations
 

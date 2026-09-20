@@ -3,35 +3,36 @@
     "step": {
       "user": {
         "title": "Build a Phrase Router rule",
-        "description": "Everything for one rule, grouped below. Expand a section to see or change it.",
+        "description": "Pick what kind of entity this rule controls, and optionally require one or more labels. Every entity of that type carrying all of the labels (in whichever area this rule applies to) becomes a target - leave the label field blank to target every entity of that type in that area instead.",
+        "data": {
+          "domain": "What to control",
+          "label_id": "Label(s) (optional)"
+        }
+      },
+      "area_scope": {
+        "title": "Which room does this apply to?",
+        "description": "\"Whichever room heard it\" uses the area of whatever voice satellite/device the phrase was spoken to - walk into a room and say it, and it targets that room automatically.",
+        "data": {
+          "area_scope": "Area scope"
+        }
+      },
+      "fixed_area": {
+        "title": "Pick the room",
+        "data": {
+          "fixed_area": "Room"
+        }
+      },
+      "wordings": {
+        "title": "Phrases",
+        "description": "Comma-separated. \"Toggle\" is required and is what runs if neither of the others match. \"On\"/\"Off\" are optional explicit wordings. Response on success and response when the action fails are shown here; the less-common not-found/unknown-room responses are in the section below - every response is independent and optional, and blank keeps that outcome's original behavior (Assist's default reply on success, silence on no match, the built-in \"not sure which room\" reply, or letting the error propagate).",
+        "data": {
+          "toggle": "Toggle wording(s)",
+          "turn_on": "Explicit \"on\" wording(s) (optional)",
+          "turn_off": "Explicit \"off\" wording(s) (optional)",
+          "response": "Response on success (optional)",
+          "response_error": "Response when the action fails (optional)"
+        },
         "sections": {
-          "targeting": {
-            "name": "What to control",
-            "description": "Pick what kind of entity this rule controls, and optionally require one or more labels. Every entity of that type carrying all of the labels (in whichever area this rule applies to) becomes a target - leave the label field blank to target every entity of that type in that area instead.",
-            "data": {
-              "domain": "What to control",
-              "label_id": "Label(s) (optional)"
-            }
-          },
-          "area": {
-            "name": "Where",
-            "description": "\"Whichever room heard it\" uses the area of whatever voice satellite/device the phrase was spoken to - walk into a room and say it, and it targets that room automatically. Room only matters when area scope is \"Always one specific room\".",
-            "data": {
-              "area_scope": "Area scope",
-              "fixed_area": "Room (used only when area scope is \"Always one specific room\")"
-            }
-          },
-          "phrases": {
-            "name": "Phrases",
-            "description": "Comma-separated. \"Toggle\" is required and is what runs if neither of the others match. \"On\"/\"Off\" are optional explicit wordings. Response on success and response when the action fails are shown here; the less-common not-found/unknown-room responses are in the section below - every response is independent and optional, and blank keeps that outcome's original behavior (Assist's default reply on success, silence on no match, the built-in \"not sure which room\" reply, or letting the error propagate).",
-            "data": {
-              "toggle": "Toggle wording(s)",
-              "turn_on": "Explicit \"on\" wording(s) (optional)",
-              "turn_off": "Explicit \"off\" wording(s) (optional)",
-              "response": "Response on success (optional)",
-              "response_error": "Response when the action fails (optional)"
-            }
-          },
           "more_responses": {
             "name": "More responses",
             "description": "Less commonly customized - leave either blank to keep its original behavior.",
@@ -51,8 +52,7 @@
       }
     },
     "error": {
-      "toggle_required": "Enter at least one toggle wording.",
-      "fixed_area_required": "Pick a room, or change the area scope."
+      "toggle_required": "Enter at least one toggle wording."
     }
   },
   "options": {

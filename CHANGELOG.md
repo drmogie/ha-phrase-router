@@ -1,3 +1,9 @@
+## 2026.09.19.08 - Wizard for new rules, one page for editing
+
+- Building a brand-new rule is back to separate screens, one topic at a time (domain/label, area scope, room, phrases) - there's nothing to review yet on a new rule, so a guided walk-through fit better than a page of blank fields.
+- Editing an existing rule (its **Configure** option) keeps the one-page layout from .07 - domain/label, area scope/room, and phrases as expandable sections, with the less-common not-found/unknown-room responses collapsed - since you're usually just changing one thing and don't want to click through steps to get there.
+- No stored data changed either way - this only affects which form you see and when.
+
 ## 2026.09.19.07 - One settings page instead of a click-through wizard
 
 - Building or editing a rule is now one page with four expandable sections - **What to control** (domain, labels), **Where** (area scope, room), **Phrases** (wordings, response on success, response when the action fails), and **More responses** (the less-common not-found/unknown-room pair, collapsed by default) - instead of clicking through separate screens for each.
