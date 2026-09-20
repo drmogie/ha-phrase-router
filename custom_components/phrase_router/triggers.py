@@ -11,16 +11,17 @@ but it's registered directly by this integration's config entry, so it
 never shows up in the Automations list and there's nothing on disk to
 keep in sync.
 
-Target resolution (which light entities a rule actually controls) is a
-plain entity_registry/device_registry/area_registry scan - the domain
-check and label check deliberately mirror Label Master Control's own
-aggregator.py (a subset/AND check against entity_entry.labels - an
-entity must carry every label the rule requires, no inheritance from a
-device's or area's own labels), so both integrations agree on what
-"carries these labels" means. A rule with no labels at all matches
-every light in the resolved area, same as before; this now also
-accepts more than one label, requiring all of them together rather
-than any one of them.
+Target resolution (which entities a rule actually controls) is a plain
+entity_registry/device_registry/area_registry scan against the rule's
+own domain (light/fan/switch, all three sharing the same turn_on/
+turn_off/toggle services) - the domain check and label check
+deliberately mirror Label Master Control's own aggregator.py (a
+subset/AND check against entity_entry.labels - an entity must carry
+every label the rule requires, no inheritance from a device's or
+area's own labels), so both integrations agree on what "carries these
+labels" means. A rule with no labels at all matches every entity of
+its domain in the resolved area, same as before; more than one label
+requires all of them together rather than any one of them.
 """
 from __future__ import annotations
 
@@ -37,11 +38,12 @@ from .const import (
     AREA_SCOPE_ALL,
     AREA_SCOPE_FIXED,
     CONF_AREA_SCOPE,
+    CONF_DOMAIN,
     CONF_FIXED_AREA,
     CONF_LABEL_ID,
     CONF_WORDINGS,
+    DEFAULT_TARGET_DOMAIN,
     SERVICE_BY_WORDING,
-    TARGET_DOMAIN,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -80,15 +82,18 @@ def _normalize_label_ids(raw: Any) -> frozenset[str]:
 
 
 def _resolve_targets(
-    hass: HomeAssistant, area_id: str | None, label_ids: frozenset[str]
+    hass: HomeAssistant,
+    area_id: str | None,
+    label_ids: frozenset[str],
+    domain: str,
 ) -> list[str]:
-    """Every TARGET_DOMAIN entity carrying all of label_ids (or all
-    entities, if label_ids is empty) within area_id - or house-wide, if
+    """Every `domain` entity carrying all of label_ids (or all entities of
+    that domain, if label_ids is empty) within area_id - or house-wide, if
     area_id is None."""
     registry = er.async_get(hass)
     targets = []
     for entity_entry in registry.entities.values():
-        if entity_entry.entity_id.split(".", 1)[0] != TARGET_DOMAIN:
+        if entity_entry.entity_id.split(".", 1)[0] != domain:
             continue
         if label_ids and not label_ids.issubset(entity_entry.labels):
             continue
@@ -101,6 +106,7 @@ def _resolve_targets(
 def async_register_rule(hass: HomeAssistant, entry) -> list[CALLBACK_TYPE]:
     """Register one sentence trigger per non-empty wording bucket on this rule."""
     data: dict[str, Any] = entry.options if entry.options else entry.data
+    domain = data.get(CONF_DOMAIN, DEFAULT_TARGET_DOMAIN)
     label_ids = _normalize_label_ids(data.get(CONF_LABEL_ID))
     area_scope = data[CONF_AREA_SCOPE]
     fixed_area = data.get(CONF_FIXED_AREA)
@@ -143,18 +149,19 @@ def async_register_rule(hass: HomeAssistant, entry) -> list[CALLBACK_TYPE]:
                     )
                     return "I'm not sure which room that was."
 
-            targets = _resolve_targets(hass, area_id, label_ids)
+            targets = _resolve_targets(hass, area_id, label_ids, domain)
             if not targets:
                 _LOGGER.debug(
-                    "Phrase Router: '%s' matched '%s' but found no lights to %s",
+                    "Phrase Router: '%s' matched '%s' but found no %s entities to %s",
                     entry.title,
                     user_input.text,
+                    domain,
                     _service,
                 )
                 return None
 
             await hass.services.async_call(
-                TARGET_DOMAIN, _service, {"entity_id": targets}, blocking=True
+                domain, _service, {"entity_id": targets}, blocking=True
             )
             return None
 

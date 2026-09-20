@@ -3,8 +3,9 @@
     "step": {
       "user": {
         "title": "Build a Phrase Router rule",
-        "description": "Optionally require one or more labels. Every light carrying all of them (in whichever area this rule applies to) becomes a target - leave this blank to target every light in that area instead.",
+        "description": "Pick what kind of entity this rule controls, and optionally require one or more labels. Every entity of that type carrying all of the labels (in whichever area this rule applies to) becomes a target - leave the label field blank to target every entity of that type in that area instead.",
         "data": {
+          "domain": "What to control",
           "label_id": "Label(s) (optional)"
         }
       },
@@ -32,7 +33,7 @@
       },
       "name": {
         "title": "Name this rule",
-        "description": "Suggested from the label and room you picked - type your own if you'd rather.",
+        "description": "Suggested from the domain, label, and room you picked - type your own if you'd rather.",
         "data": {
           "name": "Name"
         }
@@ -46,8 +47,9 @@
     "step": {
       "label": {
         "title": "Phrase Router options",
-        "description": "Optionally require one or more labels.",
+        "description": "Pick what kind of entity this rule controls, and optionally require one or more labels.",
         "data": {
+          "domain": "What to control",
           "label_id": "Label(s) (optional)"
         }
       },

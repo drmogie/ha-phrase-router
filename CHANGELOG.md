@@ -1,3 +1,9 @@
+## 2026.09.19.03 - Fan and switch domains
+
+- Rules can now target **fan** or **switch** entities, not just lights - pick the domain on the first wizard screen (and in an existing rule's Configure options). Light, fan, and switch all share the same toggle/turn_on/turn_off services, so wordings and area scope work exactly the same regardless of which one you pick.
+- Existing rules keep working unchanged - a rule built before this update has nothing stored for its domain, so it's treated as a light rule, same as it always was.
+- A rule still targets exactly one domain - there's no single rule that controls both a light and a fan.
+
 # Changelog
 
 ## 2026.09.19.02 - Multiple labels per rule

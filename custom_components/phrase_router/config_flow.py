@@ -3,9 +3,11 @@
 A wizard, same shape as Label Master Control's own "pick label(s), then
 name it" flow, adapted for one voice-phrase rule instead of one
 aggregate control device:
-  1. async_step_user - optionally pick one or more labels (a light must
-     carry all of them to match). Leave it blank to match every light
-     in the resolved area, no label filter at all.
+  1. async_step_user - pick the domain this rule controls (light, fan,
+     or switch - all three share the same toggle/on/off services), and
+     optionally one or more labels (an entity must carry all of them to
+     match). Leave the label field blank to match every entity of that
+     domain in the resolved area, no label filter at all.
   2. async_step_area_scope - which room a phrase said under this rule
      applies to: whichever room the satellite that heard it belongs to,
      one fixed room always, or the whole house.
@@ -14,11 +16,12 @@ aggregate control device:
      wording, plus optional explicit "on"/"off" wordings.
   5. async_step_name - name the rule.
 
-v1 only builds light-domain rules (see const.TARGET_DOMAIN) - the
-domain isn't asked in the wizard at all yet.
-
-Its "Configure" option replays the label/area/wordings steps so an
-existing rule's phrases or targeting can change without rebuilding it.
+Its "Configure" option replays the domain/label/area/wordings steps so
+an existing rule's targeting or phrases can change without rebuilding
+it. An entry built before the domain field existed has nothing stored
+under CONF_DOMAIN and falls back to "light" (see
+const.DEFAULT_TARGET_DOMAIN) - the domain it always meant, back when
+light was the only option.
 """
 from __future__ import annotations
 
@@ -45,10 +48,13 @@ from .const import (
     AREA_SCOPE_DEVICE,
     AREA_SCOPE_FIXED,
     CONF_AREA_SCOPE,
+    CONF_DOMAIN,
     CONF_FIXED_AREA,
     CONF_LABEL_ID,
     CONF_WORDINGS,
+    DEFAULT_TARGET_DOMAIN,
     DOMAIN,
+    TARGET_DOMAIN_NAMES,
     WORDING_TOGGLE,
     WORDING_TURN_OFF,
     WORDING_TURN_ON,
@@ -60,10 +66,20 @@ _AREA_SCOPE_OPTIONS = [
     {"value": AREA_SCOPE_ALL, "label": "Whole house"},
 ]
 
+_DOMAIN_OPTIONS = [
+    {"value": domain, "label": name} for domain, name in TARGET_DOMAIN_NAMES.items()
+]
+
 
 def _area_scope_selector(default: str) -> SelectSelector:
     return SelectSelector(
         SelectSelectorConfig(options=_AREA_SCOPE_OPTIONS, mode=SelectSelectorMode.DROPDOWN)
+    )
+
+
+def _domain_selector() -> SelectSelector:
+    return SelectSelector(
+        SelectSelectorConfig(options=_DOMAIN_OPTIONS, mode=SelectSelectorMode.DROPDOWN)
     )
 
 
@@ -111,9 +127,13 @@ def _parse_wordings(user_input: dict[str, Any]) -> tuple[dict[str, list[str]], d
 
 
 def _suggested_name(
-    hass, label_ids: list[str] | None, area_scope: str, fixed_area: str | None
+    hass,
+    domain: str,
+    label_ids: list[str] | None,
+    area_scope: str,
+    fixed_area: str | None,
 ) -> str:
-    bits = ["Lights"]
+    bits = [TARGET_DOMAIN_NAMES.get(domain, TARGET_DOMAIN_NAMES[DEFAULT_TARGET_DOMAIN])]
     if label_ids:
         registry = lr.async_get(hass)
         names = [
@@ -130,7 +150,7 @@ def _suggested_name(
 
 
 class PhraseRouterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Build one voice-phrase rule: label, area scope, wordings, name."""
+    """Build one voice-phrase rule: domain, label, area scope, wordings, name."""
 
     VERSION = 1
 
@@ -140,13 +160,17 @@ class PhraseRouterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Optionally pick a label to filter targets by."""
+        """Pick the domain this rule controls, and optionally a label to filter targets by."""
         if user_input is not None:
+            self._data[CONF_DOMAIN] = user_input[CONF_DOMAIN]
             self._data[CONF_LABEL_ID] = user_input.get(CONF_LABEL_ID)
             return await self.async_step_area_scope()
 
         schema = vol.Schema(
-            {vol.Optional(CONF_LABEL_ID): LabelSelector(LabelSelectorConfig(multiple=True))}
+            {
+                vol.Required(CONF_DOMAIN, default=DEFAULT_TARGET_DOMAIN): _domain_selector(),
+                vol.Optional(CONF_LABEL_ID): LabelSelector(LabelSelectorConfig(multiple=True)),
+            }
         )
         return self.async_show_form(step_id="user", data_schema=schema)
 
@@ -206,6 +230,7 @@ class PhraseRouterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         default = _suggested_name(
             self.hass,
+            self._data.get(CONF_DOMAIN, DEFAULT_TARGET_DOMAIN),
             self._data.get(CONF_LABEL_ID),
             self._data[CONF_AREA_SCOPE],
             self._data.get(CONF_FIXED_AREA),
@@ -222,7 +247,7 @@ class PhraseRouterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 
 class PhraseRouterOptionsFlow(config_entries.OptionsFlow):
-    """Replay label / area-scope / wordings so an existing rule can change."""
+    """Replay domain / label / area-scope / wordings so an existing rule can change."""
 
     def __init__(self) -> None:
         self._data: dict[str, Any] = {}
@@ -238,20 +263,24 @@ class PhraseRouterOptionsFlow(config_entries.OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         if user_input is not None:
+            self._data[CONF_DOMAIN] = user_input[CONF_DOMAIN]
             self._data[CONF_LABEL_ID] = user_input.get(CONF_LABEL_ID)
             return await self.async_step_area_scope()
 
         # A pre-multi-label entry stored one label as a bare string; the
         # LabelSelector now needs a list default regardless of how it was
-        # originally saved.
+        # originally saved. A pre-domain entry has nothing stored under
+        # CONF_DOMAIN at all - it was always "light".
         current_labels = self._data.get(CONF_LABEL_ID)
         if isinstance(current_labels, str):
             current_labels = [current_labels]
+        current_domain = self._data.get(CONF_DOMAIN, DEFAULT_TARGET_DOMAIN)
         schema = vol.Schema(
             {
+                vol.Required(CONF_DOMAIN, default=current_domain): _domain_selector(),
                 vol.Optional(
                     CONF_LABEL_ID, default=current_labels
-                ): LabelSelector(LabelSelectorConfig(multiple=True))
+                ): LabelSelector(LabelSelectorConfig(multiple=True)),
             }
         )
         return self.async_show_form(step_id="label", data_schema=schema)
