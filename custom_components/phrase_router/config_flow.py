@@ -13,7 +13,11 @@ aggregate control device:
      one fixed room always, or the whole house.
   3. async_step_fixed_area - only shown when area_scope is "fixed".
   4. async_step_wordings - the phrases themselves: a required "toggle"
-     wording, plus optional explicit "on"/"off" wordings.
+     wording, optional explicit "on"/"off" wordings, and four
+     independent optional custom responses - spoken/typed back on a
+     successful match, when no matching entities were found, when the
+     room couldn't be resolved, and when the service call itself raised
+     an error.
   5. async_step_name - name the rule.
 
 Its "Configure" option replays the domain/label/area/wordings steps so
@@ -51,6 +55,10 @@ from .const import (
     CONF_DOMAIN,
     CONF_FIXED_AREA,
     CONF_LABEL_ID,
+    CONF_RESPONSE,
+    CONF_RESPONSE_ERROR,
+    CONF_RESPONSE_NOT_FOUND,
+    CONF_RESPONSE_UNKNOWN_ROOM,
     CONF_WORDINGS,
     DEFAULT_TARGET_DOMAIN,
     DOMAIN,
@@ -94,20 +102,35 @@ def _join_phrases(phrases: list[str] | None) -> str:
     return ", ".join(phrases or [])
 
 
-def _wordings_schema(current: dict[str, list[str]]) -> vol.Schema:
-    return vol.Schema(
-        {
-            vol.Required(
-                WORDING_TOGGLE, default=_join_phrases(current.get(WORDING_TOGGLE))
-            ): str,
-            vol.Optional(
-                WORDING_TURN_ON, default=_join_phrases(current.get(WORDING_TURN_ON))
-            ): str,
-            vol.Optional(
-                WORDING_TURN_OFF, default=_join_phrases(current.get(WORDING_TURN_OFF))
-            ): str,
-        }
-    )
+# The four independent optional per-outcome response fields, in the
+# order they're shown in the wordings step.
+_RESPONSE_FIELDS = (
+    CONF_RESPONSE,
+    CONF_RESPONSE_NOT_FOUND,
+    CONF_RESPONSE_UNKNOWN_ROOM,
+    CONF_RESPONSE_ERROR,
+)
+
+
+def _wordings_schema(
+    current: dict[str, list[str]],
+    current_responses: dict[str, str | None] | None = None,
+) -> vol.Schema:
+    current_responses = current_responses or {}
+    schema_dict: dict[Any, Any] = {
+        vol.Required(
+            WORDING_TOGGLE, default=_join_phrases(current.get(WORDING_TOGGLE))
+        ): str,
+        vol.Optional(
+            WORDING_TURN_ON, default=_join_phrases(current.get(WORDING_TURN_ON))
+        ): str,
+        vol.Optional(
+            WORDING_TURN_OFF, default=_join_phrases(current.get(WORDING_TURN_OFF))
+        ): str,
+    }
+    for field in _RESPONSE_FIELDS:
+        schema_dict[vol.Optional(field, default=current_responses.get(field) or "")] = str
+    return vol.Schema(schema_dict)
 
 
 def _parse_wordings(user_input: dict[str, Any]) -> tuple[dict[str, list[str]], dict[str, str]]:
@@ -208,11 +231,13 @@ class PhraseRouterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_wordings(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """The phrases: required toggle, optional explicit on/off."""
+        """The phrases: required toggle, optional explicit on/off, optional response."""
         if user_input is not None:
             wordings, errors = _parse_wordings(user_input)
             if not errors:
                 self._data[CONF_WORDINGS] = wordings
+                for field in _RESPONSE_FIELDS:
+                    self._data[field] = user_input.get(field) or None
                 return await self.async_step_name()
         else:
             errors = {}
@@ -329,10 +354,16 @@ class PhraseRouterOptionsFlow(config_entries.OptionsFlow):
             wordings, errors = _parse_wordings(user_input)
             if not errors:
                 self._data[CONF_WORDINGS] = wordings
+                for field in _RESPONSE_FIELDS:
+                    self._data[field] = user_input.get(field) or None
                 return self.async_create_entry(title="", data=self._data)
         else:
             errors = {}
 
         return self.async_show_form(
-            step_id="wordings", data_schema=_wordings_schema(current), errors=errors
+            step_id="wordings",
+            data_schema=_wordings_schema(
+                current, {field: self._data.get(field) for field in _RESPONSE_FIELDS}
+            ),
+            errors=errors,
         )

@@ -24,11 +24,15 @@
       },
       "wordings": {
         "title": "Phrases",
-        "description": "Comma-separated. \"Toggle\" is required and is what runs if neither of the others match. \"On\"/\"Off\" are optional explicit wordings.",
+        "description": "Comma-separated. \"Toggle\" is required and is what runs if neither of the others match. \"On\"/\"Off\" are optional explicit wordings. The four responses below are each independent and optional - leave any blank to keep that outcome's original behavior (Assist's default reply on success, silence on no match, the built-in \"not sure which room\" reply, or letting the error propagate).",
         "data": {
           "toggle": "Toggle wording(s)",
           "turn_on": "Explicit \"on\" wording(s) (optional)",
-          "turn_off": "Explicit \"off\" wording(s) (optional)"
+          "turn_off": "Explicit \"off\" wording(s) (optional)",
+          "response": "Response on success (optional)",
+          "response_not_found": "Response when nothing matched (optional)",
+          "response_unknown_room": "Response when the room can't be resolved (optional)",
+          "response_error": "Response when the action fails (optional)"
         }
       },
       "name": {
@@ -67,11 +71,15 @@
       },
       "wordings": {
         "title": "Phrases",
-        "description": "Comma-separated. \"Toggle\" is required.",
+        "description": "Comma-separated. \"Toggle\" is required. The four responses below are each independent and optional - leave any blank to keep that outcome's original behavior.",
         "data": {
           "toggle": "Toggle wording(s)",
           "turn_on": "Explicit \"on\" wording(s) (optional)",
-          "turn_off": "Explicit \"off\" wording(s) (optional)"
+          "turn_off": "Explicit \"off\" wording(s) (optional)",
+          "response": "Response on success (optional)",
+          "response_not_found": "Response when nothing matched (optional)",
+          "response_unknown_room": "Response when the room can't be resolved (optional)",
+          "response_error": "Response when the action fails (optional)"
         }
       }
     },

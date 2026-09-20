@@ -22,6 +22,15 @@ area's own labels), so both integrations agree on what "carries these
 labels" means. A rule with no labels at all matches every entity of
 its domain in the resolved area, same as before; more than one label
 requires all of them together rather than any one of them.
+
+A rule can optionally set its own reply for each of four outcomes -
+success (CONF_RESPONSE), no matching entities found
+(CONF_RESPONSE_NOT_FOUND), the room couldn't be resolved
+(CONF_RESPONSE_UNKNOWN_ROOM), and the service call itself raising an
+error (CONF_RESPONSE_ERROR). Each is independent and optional: leaving
+any of them blank keeps that outcome's old behavior exactly (the
+unknown-room case falls back to its original hardcoded sentence, the
+other two stay silent / re-raise the error respectively).
 """
 from __future__ import annotations
 
@@ -41,8 +50,13 @@ from .const import (
     CONF_DOMAIN,
     CONF_FIXED_AREA,
     CONF_LABEL_ID,
+    CONF_RESPONSE,
+    CONF_RESPONSE_ERROR,
+    CONF_RESPONSE_NOT_FOUND,
+    CONF_RESPONSE_UNKNOWN_ROOM,
     CONF_WORDINGS,
     DEFAULT_TARGET_DOMAIN,
+    DEFAULT_UNKNOWN_ROOM_RESPONSE,
     SERVICE_BY_WORDING,
 )
 
@@ -111,6 +125,10 @@ def async_register_rule(hass: HomeAssistant, entry) -> list[CALLBACK_TYPE]:
     area_scope = data[CONF_AREA_SCOPE]
     fixed_area = data.get(CONF_FIXED_AREA)
     wordings = data.get(CONF_WORDINGS, {})
+    response = data.get(CONF_RESPONSE) or None
+    not_found_response = data.get(CONF_RESPONSE_NOT_FOUND) or None
+    unknown_room_response = data.get(CONF_RESPONSE_UNKNOWN_ROOM) or DEFAULT_UNKNOWN_ROOM_RESPONSE
+    error_response = data.get(CONF_RESPONSE_ERROR) or None
 
     agent_manager = get_agent_manager(hass)
     ent_reg = er.async_get(hass)
@@ -147,7 +165,7 @@ def async_register_rule(hass: HomeAssistant, entry) -> list[CALLBACK_TYPE]:
                         entry.title,
                         user_input.text,
                     )
-                    return "I'm not sure which room that was."
+                    return unknown_room_response
 
             targets = _resolve_targets(hass, area_id, label_ids, domain)
             if not targets:
@@ -158,12 +176,23 @@ def async_register_rule(hass: HomeAssistant, entry) -> list[CALLBACK_TYPE]:
                     domain,
                     _service,
                 )
-                return None
+                return not_found_response
 
-            await hass.services.async_call(
-                domain, _service, {"entity_id": targets}, blocking=True
-            )
-            return None
+            try:
+                await hass.services.async_call(
+                    domain, _service, {"entity_id": targets}, blocking=True
+                )
+            except Exception:
+                _LOGGER.exception(
+                    "Phrase Router: '%s' failed to %s %s",
+                    entry.title,
+                    _service,
+                    targets,
+                )
+                if error_response:
+                    return error_response
+                raise
+            return response
 
         unsubs.append(
             agent_manager.register_trigger(

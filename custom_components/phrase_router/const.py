@@ -9,6 +9,15 @@ CONF_LABEL_ID = "label_id"
 CONF_AREA_SCOPE = "area_scope"
 CONF_FIXED_AREA = "fixed_area"
 CONF_WORDINGS = "wordings"
+CONF_RESPONSE = "response"
+CONF_RESPONSE_NOT_FOUND = "response_not_found"
+CONF_RESPONSE_UNKNOWN_ROOM = "response_unknown_room"
+CONF_RESPONSE_ERROR = "response_error"
+
+# The "couldn't tell which room" reply when a rule leaves
+# CONF_RESPONSE_UNKNOWN_ROOM blank - the same wording this integration
+# has always used.
+DEFAULT_UNKNOWN_ROOM_RESPONSE = "I'm not sure which room that was."
 
 # Domains a rule can target - all three expose the same turn_on/turn_off/
 # toggle services, so SERVICE_BY_WORDING below needs no per-domain

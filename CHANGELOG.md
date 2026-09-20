@@ -1,3 +1,9 @@
+## 2026.09.19.04 - Custom responses
+
+- Rules can now set their own reply for each of four independent outcomes: a **success** response (after a successful toggle/on/off), a **not-found** response (the domain/label filter matched nothing), an **unknown-room** response (a "whichever room heard it" rule couldn't tell which room), and an **error** response (the underlying service call itself raised an error).
+- Every field is independent and optional. Leaving one blank keeps exactly the old behavior for that outcome: Assist's own default reply on success, silence on no match, the built-in "I'm not sure which room that was." for unknown-room, and letting the error propagate for a failed service call.
+- None of the four change what actually happens - they only override what's spoken/typed back.
+
 ## 2026.09.19.03 - Fan and switch domains
 
 - Rules can now target **fan** or **switch** entities, not just lights - pick the domain on the first wizard screen (and in an existing rule's Configure options). Light, fan, and switch all share the same toggle/turn_on/turn_off services, so wordings and area scope work exactly the same regardless of which one you pick.
