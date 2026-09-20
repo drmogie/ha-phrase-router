@@ -14,10 +14,11 @@ aggregate control device:
   3. async_step_fixed_area - only shown when area_scope is "fixed".
   4. async_step_wordings - the phrases themselves: a required "toggle"
      wording, optional explicit "on"/"off" wordings, and four
-     independent optional custom responses - spoken/typed back on a
-     successful match, when no matching entities were found, when the
-     room couldn't be resolved, and when the service call itself raised
-     an error.
+     independent optional custom responses - success and error shown
+     directly (fail sits right under success, since those are the two
+     outcomes people actually customize), with the less-common
+     not-found/unknown-room pair tucked into a collapsed "More
+     responses" section.
   5. async_step_name - name the rule.
 
 Its "Configure" option replays the domain/label/area/wordings steps so
@@ -35,7 +36,7 @@ import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.core import callback
-from homeassistant.data_entry_flow import FlowResult
+from homeassistant.data_entry_flow import FlowResult, section
 from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import label_registry as lr
 from homeassistant.helpers.selector import (
@@ -59,6 +60,7 @@ from .const import (
     CONF_RESPONSE_ERROR,
     CONF_RESPONSE_NOT_FOUND,
     CONF_RESPONSE_UNKNOWN_ROOM,
+    CONF_RESPONSES_SECTION,
     CONF_WORDINGS,
     DEFAULT_TARGET_DOMAIN,
     DOMAIN,
@@ -117,20 +119,43 @@ def _wordings_schema(
     current_responses: dict[str, str | None] | None = None,
 ) -> vol.Schema:
     current_responses = current_responses or {}
-    schema_dict: dict[Any, Any] = {
-        vol.Required(
-            WORDING_TOGGLE, default=_join_phrases(current.get(WORDING_TOGGLE))
-        ): str,
-        vol.Optional(
-            WORDING_TURN_ON, default=_join_phrases(current.get(WORDING_TURN_ON))
-        ): str,
-        vol.Optional(
-            WORDING_TURN_OFF, default=_join_phrases(current.get(WORDING_TURN_OFF))
-        ): str,
-    }
-    for field in _RESPONSE_FIELDS:
-        schema_dict[vol.Optional(field, default=current_responses.get(field) or "")] = str
-    return vol.Schema(schema_dict)
+    return vol.Schema(
+        {
+            vol.Required(
+                WORDING_TOGGLE, default=_join_phrases(current.get(WORDING_TOGGLE))
+            ): str,
+            vol.Optional(
+                WORDING_TURN_ON, default=_join_phrases(current.get(WORDING_TURN_ON))
+            ): str,
+            vol.Optional(
+                WORDING_TURN_OFF, default=_join_phrases(current.get(WORDING_TURN_OFF))
+            ): str,
+            vol.Optional(
+                CONF_RESPONSE, default=current_responses.get(CONF_RESPONSE) or ""
+            ): str,
+            vol.Optional(
+                CONF_RESPONSE_ERROR,
+                default=current_responses.get(CONF_RESPONSE_ERROR) or "",
+            ): str,
+            vol.Optional(CONF_RESPONSES_SECTION): section(
+                vol.Schema(
+                    {
+                        vol.Optional(
+                            CONF_RESPONSE_NOT_FOUND,
+                            default=current_responses.get(CONF_RESPONSE_NOT_FOUND)
+                            or "",
+                        ): str,
+                        vol.Optional(
+                            CONF_RESPONSE_UNKNOWN_ROOM,
+                            default=current_responses.get(CONF_RESPONSE_UNKNOWN_ROOM)
+                            or "",
+                        ): str,
+                    }
+                ),
+                {"collapsed": True},
+            ),
+        }
+    )
 
 
 def _parse_wordings(user_input: dict[str, Any]) -> tuple[dict[str, list[str]], dict[str, str]]:
@@ -146,6 +171,24 @@ def _parse_wordings(user_input: dict[str, Any]) -> tuple[dict[str, list[str]], d
             WORDING_TURN_OFF: _split_phrases(user_input.get(WORDING_TURN_OFF)),
         },
         errors,
+    )
+
+
+def _store_responses(data: dict[str, Any], user_input: dict[str, Any]) -> None:
+    """Pull all four response fields out of user_input and into data.
+
+    Success and error come straight off the top level; not-found and
+    unknown-room arrive nested under CONF_RESPONSES_SECTION (that's how
+    HA's collapsible "section" schema submits its fields) and get
+    flattened back onto the same flat keys triggers.py already reads -
+    it never needs to know the section exists.
+    """
+    data[CONF_RESPONSE] = user_input.get(CONF_RESPONSE) or None
+    data[CONF_RESPONSE_ERROR] = user_input.get(CONF_RESPONSE_ERROR) or None
+    advanced = user_input.get(CONF_RESPONSES_SECTION) or {}
+    data[CONF_RESPONSE_NOT_FOUND] = advanced.get(CONF_RESPONSE_NOT_FOUND) or None
+    data[CONF_RESPONSE_UNKNOWN_ROOM] = (
+        advanced.get(CONF_RESPONSE_UNKNOWN_ROOM) or None
     )
 
 
@@ -236,8 +279,7 @@ class PhraseRouterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             wordings, errors = _parse_wordings(user_input)
             if not errors:
                 self._data[CONF_WORDINGS] = wordings
-                for field in _RESPONSE_FIELDS:
-                    self._data[field] = user_input.get(field) or None
+                _store_responses(self._data, user_input)
                 return await self.async_step_name()
         else:
             errors = {}
@@ -354,8 +396,7 @@ class PhraseRouterOptionsFlow(config_entries.OptionsFlow):
             wordings, errors = _parse_wordings(user_input)
             if not errors:
                 self._data[CONF_WORDINGS] = wordings
-                for field in _RESPONSE_FIELDS:
-                    self._data[field] = user_input.get(field) or None
+                _store_responses(self._data, user_input)
                 return self.async_create_entry(title="", data=self._data)
         else:
             errors = {}

@@ -14,6 +14,13 @@ CONF_RESPONSE_NOT_FOUND = "response_not_found"
 CONF_RESPONSE_UNKNOWN_ROOM = "response_unknown_room"
 CONF_RESPONSE_ERROR = "response_error"
 
+# Form-only key for the collapsed "more responses" section in the wordings
+# step - the not-found and unknown-room fields live inside it. Never
+# stored itself; its two sub-fields get flattened back to
+# CONF_RESPONSE_NOT_FOUND / CONF_RESPONSE_UNKNOWN_ROOM before saving, so
+# nothing else in the integration needs to know this section exists.
+CONF_RESPONSES_SECTION = "more_responses"
+
 # The "couldn't tell which room" reply when a rule leaves
 # CONF_RESPONSE_UNKNOWN_ROOM blank - the same wording this integration
 # has always used.

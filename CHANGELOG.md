@@ -1,3 +1,9 @@
+## 2026.09.19.05 - Reorder and collapse the response fields
+
+- In the wordings step, the **response when the action fails** field now sits directly below **response on success** - the two responses most people actually set.
+- **Response when nothing matched** and **response when the room can't be resolved** now live inside a collapsed "More responses" section instead of always being shown - expand it if you need those two. Nothing about how they behave changed, only where they show up in the form.
+- Existing rules are unaffected either way - this only reshapes the wizard, not what's stored.
+
 ## 2026.09.19.04 - Custom responses
 
 - Rules can now set their own reply for each of four independent outcomes: a **success** response (after a successful toggle/on/off), a **not-found** response (the domain/label filter matched nothing), an **unknown-room** response (a "whichever room heard it" rule couldn't tell which room), and an **error** response (the underlying service call itself raised an error).

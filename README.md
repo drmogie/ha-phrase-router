@@ -18,11 +18,11 @@ Each rule has:
 - **Label(s) (optional).** Every entity of that domain carrying *all* of the labels you pick becomes a target. Leave it blank to target every entity of that domain in the resolved room instead.
 - **Area scope.** *Whichever room heard it* (the room of the satellite/device that heard the phrase - this is the "walk in and say it" behavior), *always one specific room* (pick a fixed room regardless of where it's said), or *whole house* (no room filtering at all).
 - **Wordings.** A required **toggle** phrase (or several, comma-separated) that flips the matched entities' state, plus optional explicit **on** and **off** phrases that always do that instead of toggling.
-- **Responses (all optional, all independent).** Four separate custom replies, one per outcome:
+- **Responses (all optional, all independent).** Four separate custom replies, one per outcome. **Response on success** and **response when the action fails** sit right in the wordings step, since those are the two most people actually customize; **response when nothing matched** and **response when the room can't be resolved** are tucked into a collapsed "More responses" section below them - expand it if you need those too.
   - **Response on success** - spoken/typed back after a successful toggle/on/off. Blank keeps Assist's own default reply.
-  - **Response when nothing matched** - used when the domain/label filter found no entities to act on. Blank stays silent, same as before this feature existed.
-  - **Response when the room can't be resolved** - used for a "whichever room heard it" rule when the calling device has no area. Blank falls back to the built-in "I'm not sure which room that was."
   - **Response when the action fails** - used if the underlying service call itself raises an error. Blank lets the error propagate normally, same as before this feature existed.
+  - **Response when nothing matched** *(in "More responses")* - used when the domain/label filter found no entities to act on. Blank stays silent, same as before this feature existed.
+  - **Response when the room can't be resolved** *(in "More responses")* - used for a "whichever room heard it" rule when the calling device has no area. Blank falls back to the built-in "I'm not sure which room that was."
 
   None of these change what actually happens - they only override what's said back.
 
