@@ -1,3 +1,8 @@
+## 2026.09.19.06 - Fix: optional fields wouldn't clear back to blank
+
+- Fixed a bug where a previously-set optional field - either explicit on/off wording, any of the four responses, or the label filter - couldn't be cleared back to blank/none through the Configure options. Emptying the field and saving would silently bring the old value right back. This was Home Assistant's own well-documented `default=` quirk (a schema default doubles as the fallback for anything that looks empty, not just an untouched field) - fixed by switching those fields to `suggested_value`, which pre-fills the same way but actually lets you clear it.
+- No effect on rules that never needed to clear anything - existing values still show up exactly as before.
+
 ## 2026.09.19.05 - Reorder and collapse the response fields
 
 - In the wordings step, the **response when the action fails** field now sits directly below **response on success** - the two responses most people actually set.

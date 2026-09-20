@@ -118,6 +118,12 @@ def _wordings_schema(
     current: dict[str, list[str]],
     current_responses: dict[str, str | None] | None = None,
 ) -> vol.Schema:
+    # Every field below except the required toggle uses
+    # description={"suggested_value": ...} rather than default=... on
+    # purpose - a schema default doubles as the fallback whenever the
+    # submitted value looks empty, which silently undoes clearing a
+    # previously-set optional field back to blank. suggested_value
+    # pre-fills the same way but actually lets it be cleared.
     current_responses = current_responses or {}
     return vol.Schema(
         {
@@ -125,30 +131,50 @@ def _wordings_schema(
                 WORDING_TOGGLE, default=_join_phrases(current.get(WORDING_TOGGLE))
             ): str,
             vol.Optional(
-                WORDING_TURN_ON, default=_join_phrases(current.get(WORDING_TURN_ON))
+                WORDING_TURN_ON,
+                description={
+                    "suggested_value": _join_phrases(current.get(WORDING_TURN_ON))
+                },
             ): str,
             vol.Optional(
-                WORDING_TURN_OFF, default=_join_phrases(current.get(WORDING_TURN_OFF))
+                WORDING_TURN_OFF,
+                description={
+                    "suggested_value": _join_phrases(current.get(WORDING_TURN_OFF))
+                },
             ): str,
             vol.Optional(
-                CONF_RESPONSE, default=current_responses.get(CONF_RESPONSE) or ""
+                CONF_RESPONSE,
+                description={
+                    "suggested_value": current_responses.get(CONF_RESPONSE) or ""
+                },
             ): str,
             vol.Optional(
                 CONF_RESPONSE_ERROR,
-                default=current_responses.get(CONF_RESPONSE_ERROR) or "",
+                description={
+                    "suggested_value": current_responses.get(CONF_RESPONSE_ERROR)
+                    or ""
+                },
             ): str,
             vol.Optional(CONF_RESPONSES_SECTION): section(
                 vol.Schema(
                     {
                         vol.Optional(
                             CONF_RESPONSE_NOT_FOUND,
-                            default=current_responses.get(CONF_RESPONSE_NOT_FOUND)
-                            or "",
+                            description={
+                                "suggested_value": current_responses.get(
+                                    CONF_RESPONSE_NOT_FOUND
+                                )
+                                or ""
+                            },
                         ): str,
                         vol.Optional(
                             CONF_RESPONSE_UNKNOWN_ROOM,
-                            default=current_responses.get(CONF_RESPONSE_UNKNOWN_ROOM)
-                            or "",
+                            description={
+                                "suggested_value": current_responses.get(
+                                    CONF_RESPONSE_UNKNOWN_ROOM
+                                )
+                                or ""
+                            },
                         ): str,
                     }
                 ),
@@ -346,7 +372,8 @@ class PhraseRouterOptionsFlow(config_entries.OptionsFlow):
             {
                 vol.Required(CONF_DOMAIN, default=current_domain): _domain_selector(),
                 vol.Optional(
-                    CONF_LABEL_ID, default=current_labels
+                    CONF_LABEL_ID,
+                    description={"suggested_value": current_labels},
                 ): LabelSelector(LabelSelectorConfig(multiple=True)),
             }
         )
