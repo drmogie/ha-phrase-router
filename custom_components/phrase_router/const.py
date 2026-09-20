@@ -28,6 +28,7 @@ CONF_RESPONSE_ERROR = "response_error"
 # a section can't contain another one.
 CONF_TARGETING_SECTION = "targeting"
 CONF_AREA_SECTION = "area"
+CONF_FIXED_AREA_SECTION = "fixed_area_section"
 CONF_PHRASES_SECTION = "phrases"
 CONF_RESPONSES_SECTION = "more_responses"
 

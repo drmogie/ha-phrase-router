@@ -71,10 +71,16 @@
           },
           "area": {
             "name": "Where",
-            "description": "Room only matters when area scope is \"Always one specific room\".",
+            "description": "Whichever room heard it, always one fixed room, or the whole house.",
             "data": {
-              "area_scope": "Area scope",
-              "fixed_area": "Room (used only when area scope is \"Always one specific room\")"
+              "area_scope": "Area scope"
+            }
+          },
+          "fixed_area_section": {
+            "name": "Fixed room",
+            "description": "Only used when area scope above is \"Always one specific room\" - ignored otherwise.",
+            "data": {
+              "fixed_area": "Room"
             }
           },
           "phrases": {

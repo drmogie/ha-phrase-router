@@ -64,6 +64,7 @@ from .const import (
     CONF_AREA_SECTION,
     CONF_DOMAIN,
     CONF_FIXED_AREA,
+    CONF_FIXED_AREA_SECTION,
     CONF_LABEL_ID,
     CONF_PHRASES_SECTION,
     CONF_RESPONSE,
@@ -393,13 +394,26 @@ def _settings_schema(current: dict[str, Any]) -> vol.Schema:
                         vol.Required(
                             CONF_AREA_SCOPE, default=current_scope
                         ): _area_scope_selector(current_scope),
+                    }
+                ),
+                {"collapsed": False},
+            ),
+            # Its own section rather than folded into "area" above so it
+            # can start collapsed - Home Assistant has no way to hide a
+            # field based on a sibling field's live value within one
+            # render (still just a frontend feature proposal), so this is
+            # the closest approximation: closed by default, but already
+            # open when the rule being edited already uses "fixed".
+            vol.Required(CONF_FIXED_AREA_SECTION): section(
+                vol.Schema(
+                    {
                         vol.Optional(
                             CONF_FIXED_AREA,
                             description={"suggested_value": current_fixed_area},
                         ): AreaSelector(),
                     }
                 ),
-                {"collapsed": False},
+                {"collapsed": current_scope != AREA_SCOPE_FIXED},
             ),
             vol.Required(CONF_PHRASES_SECTION): section(
                 vol.Schema(
@@ -483,13 +497,16 @@ def _parse_settings(user_input: dict[str, Any]) -> tuple[dict[str, Any], dict[st
     errors: dict[str, str] = {}
     targeting = user_input.get(CONF_TARGETING_SECTION) or {}
     area = user_input.get(CONF_AREA_SECTION) or {}
+    fixed_area_section = user_input.get(CONF_FIXED_AREA_SECTION) or {}
     phrases = user_input.get(CONF_PHRASES_SECTION) or {}
     more_responses = user_input.get(CONF_RESPONSES_SECTION) or {}
 
     area_scope = area.get(CONF_AREA_SCOPE) or AREA_SCOPE_DEVICE
-    fixed_area = area.get(CONF_FIXED_AREA)
+    fixed_area = fixed_area_section.get(CONF_FIXED_AREA)
     if area_scope == AREA_SCOPE_FIXED and not fixed_area:
-        errors[f"{CONF_AREA_SECTION}.{CONF_FIXED_AREA}"] = "fixed_area_required"
+        errors[
+            f"{CONF_FIXED_AREA_SECTION}.{CONF_FIXED_AREA}"
+        ] = "fixed_area_required"
 
     toggle = _split_phrases(phrases.get(WORDING_TOGGLE))
     if not toggle:

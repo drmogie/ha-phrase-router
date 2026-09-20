@@ -1,3 +1,8 @@
+## 2026.09.19.09 - Tuck the room picker away when it's not needed
+
+- On the Configure page, **Room** now lives in its own "Fixed room" section instead of always sitting under Area scope - collapsed by default, and already open if the rule you're editing already uses "Always one specific room". Home Assistant doesn't yet support hiding a field live based on a sibling field's value within one form, so this is the closest available approximation rather than true reactive hiding.
+- No behavior or stored-data change - Room still only does anything when area scope is "Always one specific room".
+
 ## 2026.09.19.08 - Wizard for new rules, one page for editing
 
 - Building a brand-new rule is back to separate screens, one topic at a time (domain/label, area scope, room, phrases) - there's nothing to review yet on a new rule, so a guided walk-through fit better than a page of blank fields.
