@@ -58,12 +58,12 @@
           "brightness_medium": "Brightness: medium",
           "brightness_high": "Brightness: high",
           "brightness_full": "Brightness: full",
-          "brightness_number": "Brightness: set to a percent (e.g. \"set the lights to {value} percent\")",
+          "brightness_number": "Brightness: set to a percent (e.g. \"set the lights to '{value}' percent\")",
           "warmth_warm": "Warmth: warm",
           "warmth_neutral": "Warmth: neutral",
           "warmth_cool": "Warmth: cool",
-          "warmth_number": "Warmth: set to a value (e.g. \"set the warmth to {value}\")",
-          "color_words": "Color (e.g. \"make the lights {value}\")"
+          "warmth_number": "Warmth: set to a value (e.g. \"set the warmth to '{value}'\")",
+          "color_words": "Color (e.g. \"make the lights '{value}'\")"
         }
       }
     },
@@ -127,12 +127,12 @@
               "brightness_medium": "Brightness: medium",
               "brightness_high": "Brightness: high",
               "brightness_full": "Brightness: full",
-              "brightness_number": "Brightness: set to a percent (e.g. \"set the lights to {value} percent\")",
+              "brightness_number": "Brightness: set to a percent (e.g. \"set the lights to '{value}' percent\")",
               "warmth_warm": "Warmth: warm",
               "warmth_neutral": "Warmth: neutral",
               "warmth_cool": "Warmth: cool",
-              "warmth_number": "Warmth: set to a value (e.g. \"set the warmth to {value}\")",
-              "color_words": "Color (e.g. \"make the lights {value}\")"
+              "warmth_number": "Warmth: set to a value (e.g. \"set the warmth to '{value}'\")",
+              "color_words": "Color (e.g. \"make the lights '{value}'\")"
             }
           }
         }

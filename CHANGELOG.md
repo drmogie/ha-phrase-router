@@ -1,3 +1,9 @@
+## 2026.09.21.04 - Fix a translation error on the Light Controls fields
+
+- The brightness/warmth/color field descriptions in 2026.09.21.03 used literal `{value}` as an example (e.g. "set the lights to {value} percent"), but Home Assistant's frontend treats `{value}` in a translation string as a placeholder it must fill in, not literal text - the Configure page showed a "Translation ... MISSING_VALUE" error instead of the field's helper text.
+- Fixed by escaping it as `'{value}'` (single-quoted), which is how that translation format represents literal curly braces.
+- Text-only fix - no behavior change to what Light Controls actually does.
+
 ## 2026.09.21.03 - Light Controls, and randomized responses
 
 - **Light Controls (Lights only)**: a new optional fifth capability alongside toggle/on/off - brightness (low/medium/high/full presets plus a free-number percent wording), warmth (warm/neutral/cool presets plus a free-number Kelvin wording), and color (one wording reacting to a small built-in set of color names - red, orange, yellow, green, blue, purple, pink). Every field is optional, comma-separated like the existing phrases, and shares this rule's own responses rather than a second set.
