@@ -124,6 +124,87 @@ SERVICE_BY_WORDING = {
 # _parse_settings in config_flow.py.
 TOGGLE_OPTIONAL_DOMAINS = frozenset({TARGET_DOMAIN_LOCK})
 
+# --------------------------------------------------------------------
+# Light Controls - a light-domain rule's optional fifth capability
+# (brightness / warmth / color), alongside toggle/on/off. See
+# light_controls.py for the sentence-trigger registration itself; the
+# constants below are just the storage keys and the fixed value tables
+# each wording bucket maps to.
+#
+# Every bucket is a user-editable wording (comma-separated phrase
+# alternatives, same convention as toggle/turn_on/turn_off) except
+# color, which is a single wording whose {value} wildcard is matched at
+# runtime against a small fixed color-name vocabulary (COLOR_WORD_HS)
+# rather than exposing one wording field per color - eight-plus nearly
+# identical free-text fields would make the page unwieldy for what's a
+# nice-to-have, not the main ask.
+#
+# The brightness/warmth *values* a preset maps to are NOT user-editable
+# in v1 (only the wording that triggers them is) - keeps the config
+# surface to "what do I say" rather than also "what does it set", which
+# can always be added later if it turns out to matter.
+CONF_LIGHT_CONTROLS_SECTION = "light_controls"
+
+CONF_LC_BRIGHTNESS_LOW = "brightness_low"
+CONF_LC_BRIGHTNESS_MEDIUM = "brightness_medium"
+CONF_LC_BRIGHTNESS_HIGH = "brightness_high"
+CONF_LC_BRIGHTNESS_FULL = "brightness_full"
+CONF_LC_BRIGHTNESS_NUMBER = "brightness_number"
+CONF_LC_WARMTH_WARM = "warmth_warm"
+CONF_LC_WARMTH_NEUTRAL = "warmth_neutral"
+CONF_LC_WARMTH_COOL = "warmth_cool"
+CONF_LC_WARMTH_NUMBER = "warmth_number"
+CONF_LC_COLOR_WORDS = "color_words"
+
+LIGHT_CONTROL_WORDING_KEYS = (
+    CONF_LC_BRIGHTNESS_LOW,
+    CONF_LC_BRIGHTNESS_MEDIUM,
+    CONF_LC_BRIGHTNESS_HIGH,
+    CONF_LC_BRIGHTNESS_FULL,
+    CONF_LC_BRIGHTNESS_NUMBER,
+    CONF_LC_WARMTH_WARM,
+    CONF_LC_WARMTH_NEUTRAL,
+    CONF_LC_WARMTH_COOL,
+    CONF_LC_WARMTH_NUMBER,
+    CONF_LC_COLOR_WORDS,
+)
+
+# Fixed brightness percentages (light.turn_on's brightness_pct) for the
+# three named presets.
+BRIGHTNESS_PRESET_PCT = {
+    CONF_LC_BRIGHTNESS_LOW: 25,
+    CONF_LC_BRIGHTNESS_MEDIUM: 50,
+    CONF_LC_BRIGHTNESS_HIGH: 75,
+    CONF_LC_BRIGHTNESS_FULL: 100,
+}
+
+# Fixed color-temperature Kelvin values (light.turn_on's
+# color_temp_kelvin) for the three named warmth presets - matches the
+# "warm/neutral/cool white" vocabulary most smart bulbs already use on
+# their own boxes/apps.
+WARMTH_PRESET_KELVIN = {
+    CONF_LC_WARMTH_WARM: 2700,
+    CONF_LC_WARMTH_NEUTRAL: 4000,
+    CONF_LC_WARMTH_COOL: 6500,
+}
+
+# Sane clamp range for the free-number brightness/warmth wordings, so a
+# mis-heard or extreme number doesn't get sent to a light as-is. (low, high)
+BRIGHTNESS_NUMBER_RANGE = (1, 100)
+WARMTH_NUMBER_RANGE = (2000, 6500)
+
+# Built-in color vocabulary for CONF_LC_COLOR_WORDS - fixed hue/
+# saturation (light.turn_on's hs_color) per name.
+COLOR_WORD_HS = {
+    "red": (0, 100),
+    "orange": (30, 100),
+    "yellow": (55, 90),
+    "green": (120, 100),
+    "blue": (240, 100),
+    "purple": (280, 90),
+    "pink": (330, 80),
+}
+
 # No entity platforms - a rule is a device with no entities, just a
 # registered sentence trigger. See triggers.py.
 PLATFORMS: list[str] = []

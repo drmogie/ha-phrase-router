@@ -1,3 +1,10 @@
+## 2026.09.21.03 - Light Controls, and randomized responses
+
+- **Light Controls (Lights only)**: a new optional fifth capability alongside toggle/on/off - brightness (low/medium/high/full presets plus a free-number percent wording), warmth (warm/neutral/cool presets plus a free-number Kelvin wording), and color (one wording reacting to a small built-in set of color names - red, orange, yellow, green, blue, purple, pink). Every field is optional, comma-separated like the existing phrases, and shares this rule's own responses rather than a second set.
+- Light Controls is registered separately from toggle/on/off, imported lazily and wrapped in its own error handling - a problem there is walled off from breaking this rule's toggle/on/off, or any other rule at all. Direct lesson from 2026.09.21.01/.02: a shared top-level import that only broke at runtime took down every rule of every domain, not just the one that needed it - Light Controls can't repeat that.
+- **Randomized responses**: all four custom response fields (success, error, not-found, unknown-room) can now hold more than one line - each line is a candidate reply, and one is picked at random every time the rule fires, so a frequently-triggered rule stops always saying back the exact same sentence. A single-line response (every existing one, untouched) still behaves exactly as before. Applies to every rule, old and new, Light Controls included.
+- No changes to how toggle/on/off/cover/lock rules resolve targets or call services - this only adds a new optional capability and changes how a stored response gets picked, nothing about what "matches" means.
+
 ## 2026.09.21.02 - Fix startup crash from 2026.09.21.01
 
 - 2026.09.21.01 imported `STATE_LOCKED` from `homeassistant.const`, which does not exist on this HA version and made the integration fail to load entirely - **existing light/switch/fan rules stopped working too**, not just the new lock rule.

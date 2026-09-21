@@ -54,6 +54,8 @@ from homeassistant.helpers.selector import (
     SelectSelector,
     SelectSelectorConfig,
     SelectSelectorMode,
+    TextSelector,
+    TextSelectorConfig,
 )
 
 from .const import (
@@ -66,6 +68,7 @@ from .const import (
     CONF_FIXED_AREA,
     CONF_FIXED_AREA_SECTION,
     CONF_LABEL_ID,
+    CONF_LIGHT_CONTROLS_SECTION,
     CONF_PHRASES_SECTION,
     CONF_RESPONSE,
     CONF_RESPONSE_ERROR,
@@ -76,6 +79,8 @@ from .const import (
     CONF_WORDINGS,
     DEFAULT_TARGET_DOMAIN,
     DOMAIN,
+    LIGHT_CONTROL_WORDING_KEYS,
+    TARGET_DOMAIN_LIGHT,
     TARGET_DOMAIN_NAMES,
     TOGGLE_OPTIONAL_DOMAINS,
     WORDING_TOGGLE,
@@ -115,6 +120,32 @@ def _split_phrases(raw: str | None) -> list[str]:
 
 def _join_phrases(phrases: list[str] | None) -> str:
     return ", ".join(phrases or [])
+
+
+def _multiline_response_selector() -> TextSelector:
+    """Any of the four response fields can hold more than one line - see
+    responses.pick_response, which picks one non-blank line at random
+    each time the rule fires. A single-line value (every rule's
+    existing custom response, untouched) still works exactly as
+    before."""
+    return TextSelector(TextSelectorConfig(multiline=True))
+
+
+def _light_controls_fields(current: dict[str, list[str]]) -> dict:
+    """The Light Controls wording fields, shared between the wizard's
+    own step and the Configure page's light_controls section. `current`
+    is CONF_LIGHT_CONTROLS_SECTION's own already-flat dict (brightness_
+    low -> phrase list, etc.) - empty on first creation. Every field is
+    optional and comma-separated, same convention as toggle/turn_on/
+    turn_off; leaving one blank simply means that wording never gets
+    registered (see light_controls.py)."""
+
+    def _field(key: str) -> vol.Optional:
+        return vol.Optional(
+            key, description={"suggested_value": _join_phrases(current.get(key))}
+        )
+
+    return {_field(key): str for key in LIGHT_CONTROL_WORDING_KEYS}
 
 
 def _suggested_name(
@@ -184,14 +215,14 @@ def _wordings_schema(
                 description={
                     "suggested_value": current_responses.get(CONF_RESPONSE) or ""
                 },
-            ): str,
+            ): _multiline_response_selector(),
             vol.Optional(
                 CONF_RESPONSE_ERROR,
                 description={
                     "suggested_value": current_responses.get(CONF_RESPONSE_ERROR)
                     or ""
                 },
-            ): str,
+            ): _multiline_response_selector(),
             vol.Optional(CONF_RESPONSES_SECTION): section(
                 vol.Schema(
                     {
@@ -203,7 +234,7 @@ def _wordings_schema(
                                 )
                                 or ""
                             },
-                        ): str,
+                        ): _multiline_response_selector(),
                         vol.Optional(
                             CONF_RESPONSE_UNKNOWN_ROOM,
                             description={
@@ -212,7 +243,7 @@ def _wordings_schema(
                                 )
                                 or ""
                             },
-                        ): str,
+                        ): _multiline_response_selector(),
                     }
                 ),
                 {"collapsed": True},
@@ -330,6 +361,8 @@ class PhraseRouterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if not errors:
                 self._data[CONF_WORDINGS] = wordings
                 _store_responses(self._data, user_input)
+                if domain == TARGET_DOMAIN_LIGHT:
+                    return await self.async_step_light_controls()
                 return await self.async_step_name()
         else:
             errors = {}
@@ -339,6 +372,23 @@ class PhraseRouterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=_wordings_schema({}, domain=domain),
             errors=errors,
         )
+
+    async def async_step_light_controls(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Only reached for light-domain rules - optional brightness/
+        warmth/color wordings, stored separately from CONF_WORDINGS (see
+        light_controls.py). Every field is optional, so this step always
+        proceeds regardless of what was entered."""
+        if user_input is not None:
+            self._data[CONF_LIGHT_CONTROLS_SECTION] = {
+                key: _split_phrases(user_input.get(key))
+                for key in LIGHT_CONTROL_WORDING_KEYS
+            }
+            return await self.async_step_name()
+
+        schema = vol.Schema(_light_controls_fields({}))
+        return self.async_show_form(step_id="light_controls", data_schema=schema)
 
     async def async_step_name(
         self, user_input: dict[str, Any] | None = None
@@ -403,8 +453,7 @@ def _settings_schema(current: dict[str, Any]) -> vol.Schema:
     current_fixed_area = current.get(CONF_FIXED_AREA)
     wordings = current.get(CONF_WORDINGS, {})
 
-    return vol.Schema(
-        {
+    schema_dict: dict[Any, Any] = {
             vol.Required(CONF_TARGETING_SECTION): section(
                 vol.Schema(
                     {
@@ -471,14 +520,14 @@ def _settings_schema(current: dict[str, Any]) -> vol.Schema:
                             description={
                                 "suggested_value": current.get(CONF_RESPONSE) or ""
                             },
-                        ): str,
+                        ): _multiline_response_selector(),
                         vol.Optional(
                             CONF_RESPONSE_ERROR,
                             description={
                                 "suggested_value": current.get(CONF_RESPONSE_ERROR)
                                 or ""
                             },
-                        ): str,
+                        ): _multiline_response_selector(),
                     }
                 ),
                 {"collapsed": False},
@@ -494,7 +543,7 @@ def _settings_schema(current: dict[str, Any]) -> vol.Schema:
                                 )
                                 or ""
                             },
-                        ): str,
+                        ): _multiline_response_selector(),
                         vol.Optional(
                             CONF_RESPONSE_UNKNOWN_ROOM,
                             description={
@@ -503,13 +552,24 @@ def _settings_schema(current: dict[str, Any]) -> vol.Schema:
                                 )
                                 or ""
                             },
-                        ): str,
+                        ): _multiline_response_selector(),
                     }
                 ),
                 {"collapsed": True},
             ),
-        }
-    )
+    }
+
+    # Only shown for light-domain rules - see light_controls.py and the
+    # module docstring on why this is a separate section rather than
+    # folded into "phrases" above.
+    if current_domain == TARGET_DOMAIN_LIGHT:
+        light_controls = current.get(CONF_LIGHT_CONTROLS_SECTION, {})
+        schema_dict[vol.Optional(CONF_LIGHT_CONTROLS_SECTION)] = section(
+            vol.Schema(_light_controls_fields(light_controls)),
+            {"collapsed": True},
+        )
+
+    return vol.Schema(schema_dict)
 
 
 def _parse_settings(user_input: dict[str, Any]) -> tuple[dict[str, Any], dict[str, str]]:
@@ -528,6 +588,7 @@ def _parse_settings(user_input: dict[str, Any]) -> tuple[dict[str, Any], dict[st
     fixed_area_section = user_input.get(CONF_FIXED_AREA_SECTION) or {}
     phrases = user_input.get(CONF_PHRASES_SECTION) or {}
     more_responses = user_input.get(CONF_RESPONSES_SECTION) or {}
+    light_controls_input = user_input.get(CONF_LIGHT_CONTROLS_SECTION) or {}
 
     domain = targeting.get(CONF_DOMAIN, DEFAULT_TARGET_DOMAIN)
     area_scope = area.get(CONF_AREA_SCOPE) or AREA_SCOPE_DEVICE
@@ -563,6 +624,13 @@ def _parse_settings(user_input: dict[str, Any]) -> tuple[dict[str, Any], dict[st
         CONF_RESPONSE_NOT_FOUND: more_responses.get(CONF_RESPONSE_NOT_FOUND) or None,
         CONF_RESPONSE_UNKNOWN_ROOM: more_responses.get(CONF_RESPONSE_UNKNOWN_ROOM)
         or None,
+        # Only meaningful for light-domain rules, but harmless to store
+        # (and re-read as all-empty lists) for any other domain - see
+        # light_controls.py, which simply never gets called for them.
+        CONF_LIGHT_CONTROLS_SECTION: {
+            key: _split_phrases(light_controls_input.get(key))
+            for key in LIGHT_CONTROL_WORDING_KEYS
+        },
     }
     return data, errors
 

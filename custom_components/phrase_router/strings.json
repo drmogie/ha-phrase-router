@@ -24,7 +24,7 @@
       },
       "wordings": {
         "title": "Phrases",
-        "description": "Comma-separated. \"Toggle\" is required and is what runs if neither of the others match - except for Locks, where toggle is optional (it unlocks whichever targets are currently locked and locks the rest, since there's no single lock \"toggle\" service) and at least one of toggle/on/off must be filled in instead. \"On\"/\"Off\" are optional explicit wordings; for Covers \"on\" opens and \"off\" closes, and for Locks \"on\" unlocks and \"off\" locks. Response on success and response when the action fails are shown here; the less-common not-found/unknown-room responses are in the section below - every response is independent and optional, and blank keeps that outcome's original behavior (Assist's default reply on success, silence on no match, the built-in \"not sure which room\" reply, or letting the error propagate).",
+        "description": "Comma-separated. \"Toggle\" is required and is what runs if neither of the others match - except for Locks, where toggle is optional (it unlocks whichever targets are currently locked and locks the rest, since there's no single lock \"toggle\" service) and at least one of toggle/on/off must be filled in instead. \"On\"/\"Off\" are optional explicit wordings; for Covers \"on\" opens and \"off\" closes, and for Locks \"on\" unlocks and \"off\" locks. Response on success and response when the action fails are shown here; the less-common not-found/unknown-room responses are in the section below - every response is independent and optional, and blank keeps that outcome's original behavior (Assist's default reply on success, silence on no match, the built-in \"not sure which room\" reply, or letting the error propagate). Any response field can hold more than one line - each line is a candidate reply, and one is picked at random every time the rule fires, so it doesn't always say the exact same thing back.",
         "data": {
           "toggle": "Toggle wording(s)",
           "turn_on": "Explicit \"on\" wording(s) (optional)",
@@ -35,7 +35,7 @@
         "sections": {
           "more_responses": {
             "name": "More responses",
-            "description": "Less commonly customized - leave either blank to keep its original behavior.",
+            "description": "Less commonly customized - leave either blank to keep its original behavior. Any response field can hold more than one line - each line is a candidate reply, and one is picked at random every time the rule fires, so it doesn't always say the exact same thing back.",
             "data": {
               "response_not_found": "Response when nothing matched (optional)",
               "response_unknown_room": "Response when the room can't be resolved (optional)"
@@ -48,6 +48,22 @@
         "description": "Suggested from the domain, label, and room you picked - type your own if you'd rather.",
         "data": {
           "name": "Name"
+        }
+      },
+      "light_controls": {
+        "title": "Light Controls (optional)",
+        "description": "Only for Lights. Each field is optional and comma-separated, same as the Phrases above - leave any blank to skip it. Brightness and warmth each have three named levels plus a free-number wording (say a percent for brightness, or a Kelvin value for warmth - whatever number is heard gets used, clamped to a safe range). Color reacts to a small built-in set of color names (red, orange, yellow, green, blue, purple, pink) inside whatever you type here - one wording covers all of them rather than a field per color. These share this rule's own success/error/not-found/unknown-room responses above, not a separate set.",
+        "data": {
+          "brightness_low": "Brightness: low",
+          "brightness_medium": "Brightness: medium",
+          "brightness_high": "Brightness: high",
+          "brightness_full": "Brightness: full",
+          "brightness_number": "Brightness: set to a percent (e.g. \"set the lights to {value} percent\")",
+          "warmth_warm": "Warmth: warm",
+          "warmth_neutral": "Warmth: neutral",
+          "warmth_cool": "Warmth: cool",
+          "warmth_number": "Warmth: set to a value (e.g. \"set the warmth to {value}\")",
+          "color_words": "Color (e.g. \"make the lights {value}\")"
         }
       }
     },
@@ -86,7 +102,7 @@
           },
           "phrases": {
             "name": "Phrases",
-            "description": "Comma-separated. \"Toggle\" is required, except for Locks (optional there - see the toggle field's own note) where at least one of toggle/on/off must be filled in instead. For Covers \"on\" opens and \"off\" closes; for Locks \"on\" unlocks and \"off\" locks. Response on success and response when the action fails are shown here; the less-common not-found/unknown-room responses are in the section below - every response is independent and optional, and blank keeps that outcome's original behavior.",
+            "description": "Comma-separated. \"Toggle\" is required, except for Locks (optional there - see the toggle field's own note) where at least one of toggle/on/off must be filled in instead. For Covers \"on\" opens and \"off\" closes; for Locks \"on\" unlocks and \"off\" locks. Response on success and response when the action fails are shown here; the less-common not-found/unknown-room responses are in the section below - every response is independent and optional, and blank keeps that outcome's original behavior. Any response field can hold more than one line - each line is a candidate reply, and one is picked at random every time the rule fires, so it doesn't always say the exact same thing back.",
             "data": {
               "toggle": "Toggle wording(s)",
               "turn_on": "Explicit \"on\" wording(s) (optional)",
@@ -97,10 +113,26 @@
           },
           "more_responses": {
             "name": "More responses",
-            "description": "Less commonly customized - leave either blank to keep its original behavior.",
+            "description": "Less commonly customized - leave either blank to keep its original behavior. Any response field can hold more than one line - each line is a candidate reply, and one is picked at random every time the rule fires, so it doesn't always say the exact same thing back.",
             "data": {
               "response_not_found": "Response when nothing matched (optional)",
               "response_unknown_room": "Response when the room can't be resolved (optional)"
+            }
+          },
+          "light_controls": {
+            "name": "Light Controls",
+            "description": "Only for Lights. Each field is optional and comma-separated, same as the Phrases above - leave any blank to skip it. Brightness and warmth each have three named levels plus a free-number wording (say a percent for brightness, or a Kelvin value for warmth - whatever number is heard gets used, clamped to a safe range). Color reacts to a small built-in set of color names (red, orange, yellow, green, blue, purple, pink) inside whatever you type here - one wording covers all of them rather than a field per color. These share this rule's own success/error/not-found/unknown-room responses above, not a separate set.",
+            "data": {
+              "brightness_low": "Brightness: low",
+              "brightness_medium": "Brightness: medium",
+              "brightness_high": "Brightness: high",
+              "brightness_full": "Brightness: full",
+              "brightness_number": "Brightness: set to a percent (e.g. \"set the lights to {value} percent\")",
+              "warmth_warm": "Warmth: warm",
+              "warmth_neutral": "Warmth: neutral",
+              "warmth_cool": "Warmth: cool",
+              "warmth_number": "Warmth: set to a value (e.g. \"set the warmth to {value}\")",
+              "color_words": "Color (e.g. \"make the lights {value}\")"
             }
           }
         }

@@ -9,26 +9,62 @@ conversation agent via the same mechanism the built-in Automation
 config/custom_sentences and no automation is created, so a rule never
 shows up in the Automations list, only as its own device under this
 integration.
+
+A light-domain rule additionally registers its optional Light Controls
+(brightness/warmth/color) wordings here, but deliberately not the same
+way as its toggle/on/off wordings: light_controls is imported lazily,
+inside async_setup_entry rather than at module import time, and any
+failure while importing or registering it is caught and logged rather
+than raised - see the try/except below. 2026.09.21.01 shipped a bad
+top-level import in triggers.py that broke every rule of every domain
+on this integration, not just the one that needed it (fixed in
+2026.09.21.02 - see CHANGELOG); Light Controls is new, less-proven
+wildcard-based matching, so it gets its own blast-radius limit instead
+of trusting it not to repeat that.
 """
 from __future__ import annotations
+
+import logging
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 
-from .const import CONF_DOMAIN, DEFAULT_TARGET_DOMAIN, DOMAIN, MANUFACTURER, PLATFORMS
+from .const import (
+    CONF_DOMAIN,
+    DEFAULT_TARGET_DOMAIN,
+    DOMAIN,
+    MANUFACTURER,
+    PLATFORMS,
+    TARGET_DOMAIN_LIGHT,
+)
 from .triggers import async_register_rule
+
+_LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Register one phrase rule's sentence trigger(s)."""
     unsubs = async_register_rule(hass, entry)
 
-    hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN][entry.entry_id] = {"unsubs": unsubs}
-
     data = entry.options if entry.options else entry.data
     rule_domain = data.get(CONF_DOMAIN, DEFAULT_TARGET_DOMAIN)
+
+    if rule_domain == TARGET_DOMAIN_LIGHT:
+        try:
+            from .light_controls import async_register_light_controls
+
+            unsubs.extend(async_register_light_controls(hass, entry))
+        except Exception:
+            _LOGGER.exception(
+                "Phrase Router: '%s' failed to register its Light Controls "
+                "wordings - this rule's toggle/on/off (and every other "
+                "rule) are unaffected",
+                entry.title,
+            )
+
+    hass.data.setdefault(DOMAIN, {})
+    hass.data[DOMAIN][entry.entry_id] = {"unsubs": unsubs}
 
     device_registry = dr.async_get(hass)
     device_registry.async_get_or_create(

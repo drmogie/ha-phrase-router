@@ -30,6 +30,11 @@ error (CONF_RESPONSE_ERROR). Each is independent and optional: leaving
 any of them blank keeps that outcome's old behavior exactly (the
 unknown-room case falls back to its original hardcoded sentence, the
 other two stay silent / re-raise the error respectively).
+
+Any of the four can hold more than one line - see responses.py's
+pick_response(), which is what actually resolves the stored text down
+to a single reply, picking a random non-blank line each time the rule
+fires so a frequent rule doesn't always say the exact same sentence.
 """
 from __future__ import annotations
 
@@ -42,6 +47,7 @@ from homeassistant.core import CALLBACK_TYPE, HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 
+from .responses import pick_response
 from .const import (
     AREA_SCOPE_ALL,
     AREA_SCOPE_FIXED,
@@ -177,10 +183,10 @@ def async_register_rule(hass: HomeAssistant, entry) -> list[CALLBACK_TYPE]:
     area_scope = data[CONF_AREA_SCOPE]
     fixed_area = data.get(CONF_FIXED_AREA)
     wordings = data.get(CONF_WORDINGS, {})
-    response = data.get(CONF_RESPONSE) or None
-    not_found_response = data.get(CONF_RESPONSE_NOT_FOUND) or None
-    unknown_room_response = data.get(CONF_RESPONSE_UNKNOWN_ROOM) or DEFAULT_UNKNOWN_ROOM_RESPONSE
-    error_response = data.get(CONF_RESPONSE_ERROR) or None
+    response_raw = data.get(CONF_RESPONSE)
+    not_found_raw = data.get(CONF_RESPONSE_NOT_FOUND)
+    unknown_room_raw = data.get(CONF_RESPONSE_UNKNOWN_ROOM)
+    error_raw = data.get(CONF_RESPONSE_ERROR)
     domain_services = SERVICE_BY_WORDING.get(domain, {})
 
     agent_manager = get_agent_manager(hass)
@@ -220,7 +226,7 @@ def async_register_rule(hass: HomeAssistant, entry) -> list[CALLBACK_TYPE]:
                         entry.title,
                         user_input.text,
                     )
-                    return unknown_room_response
+                    return pick_response(unknown_room_raw) or DEFAULT_UNKNOWN_ROOM_RESPONSE
 
             targets = _resolve_targets(hass, area_id, label_ids, domain)
             if not targets:
@@ -231,7 +237,7 @@ def async_register_rule(hass: HomeAssistant, entry) -> list[CALLBACK_TYPE]:
                     domain,
                     _service or _wording_key,
                 )
-                return not_found_response
+                return pick_response(not_found_raw)
 
             try:
                 await _call_targets(hass, domain, _service, targets)
@@ -242,10 +248,11 @@ def async_register_rule(hass: HomeAssistant, entry) -> list[CALLBACK_TYPE]:
                     _service or _wording_key,
                     targets,
                 )
-                if error_response:
-                    return error_response
+                picked_error = pick_response(error_raw)
+                if picked_error:
+                    return picked_error
                 raise
-            return response
+            return pick_response(response_raw)
 
         unsubs.append(
             agent_manager.register_trigger(
