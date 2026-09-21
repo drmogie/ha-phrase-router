@@ -1,3 +1,11 @@
+## 2026.09.21.01 - Cover and lock domains
+
+- Rules can now target **cover** or **lock** entities, alongside light/fan/switch.
+- **Cover**: "toggle" opens if closed and closes if open (cover's own native toggle service), "on" opens, "off" closes.
+- **Lock**: there's no native lock toggle service, so a lock rule's toggle is handled per-door instead of one blind service call - it unlocks whichever targets are currently locked and locks the rest, each door acting on its own current state. "On" unlocks, "off" locks.
+- Because lock has no real toggle service, **toggle is optional for lock rules only** (every other domain still requires it) - a lock rule just needs at least one of toggle/on/off filled in.
+- Existing rules are unaffected - light/fan/switch behavior is unchanged, and an entry with nothing stored for its domain still falls back to light, same as always.
+
 ## 2026.09.19.09 - Tuck the room picker away when it's not needed
 
 - On the Configure page, **Room** now lives in its own "Fixed room" section instead of always sitting under Area scope - collapsed by default, and already open if the rule you're editing already uses "Always one specific room". Home Assistant doesn't yet support hiding a field live based on a sibling field's value within one form, so this is the closest available approximation rather than true reactive hiding.
@@ -26,6 +34,7 @@
 - In the wordings step, the **response when the action fails** field now sits directly below **response on success** - the two responses most people actually set.
 - **Response when nothing matched** and **response when the room can't be resolved** now live inside a collapsed "More responses" section instead of always being shown - expand it if you need those two. Nothing about how they behave changed, only where they show up in the form.
 - Existing rules are unaffected either way - this only reshapes the wizard, not what's stored.
+
 
 ## 2026.09.19.04 - Custom responses
 

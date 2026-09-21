@@ -13,15 +13,14 @@ keep in sync.
 
 Target resolution (which entities a rule actually controls) is a plain
 entity_registry/device_registry/area_registry scan against the rule's
-own domain (light/fan/switch, all three sharing the same turn_on/
-turn_off/toggle services) - the domain check and label check
-deliberately mirror Label Master Control's own aggregator.py (a
-subset/AND check against entity_entry.labels - an entity must carry
-every label the rule requires, no inheritance from a device's or
-area's own labels), so both integrations agree on what "carries these
-labels" means. A rule with no labels at all matches every entity of
-its domain in the resolved area, same as before; more than one label
-requires all of them together rather than any one of them.
+own domain - the domain check and label check deliberately mirror
+Label Master Control's own aggregator.py (a subset/AND check against
+entity_entry.labels - an entity must carry every label the rule
+requires, no inheritance from a device's or area's own labels), so both
+integrations agree on what "carries these labels" means. A rule with no
+labels at all matches every entity of its domain in the resolved area,
+same as before; more than one label requires all of them together
+rather than any one of them.
 
 A rule can optionally set its own reply for each of four outcomes -
 success (CONF_RESPONSE), no matching entities found
@@ -39,6 +38,7 @@ from typing import Any
 
 from homeassistant.components.conversation.agent_manager import get_agent_manager
 from homeassistant.components.conversation.models import ConversationInput
+from homeassistant.const import STATE_LOCKED
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
@@ -58,6 +58,8 @@ from .const import (
     DEFAULT_TARGET_DOMAIN,
     DEFAULT_UNKNOWN_ROOM_RESPONSE,
     SERVICE_BY_WORDING,
+    TARGET_DOMAIN_LOCK,
+    WORDING_KEYS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -117,6 +119,57 @@ def _resolve_targets(
     return targets
 
 
+async def _toggle_locks(hass: HomeAssistant, targets: list[str]) -> None:
+    """Lock has no native toggle service (only lock.lock/lock.unlock/
+    lock.open), so "toggle" is handled per-entity here instead of one
+    service call for the whole target list: whichever locks are
+    currently locked get unlocked, everything else (unlocked, unknown,
+    jammed, opening, etc.) gets locked - each door decides on its own
+    current state, the same way light.toggle/fan.toggle/switch.toggle
+    flip each entity independently rather than syncing the whole group
+    to one new state.
+    """
+    locked = [
+        entity_id
+        for entity_id in targets
+        if (state := hass.states.get(entity_id)) is not None
+        and state.state == STATE_LOCKED
+    ]
+    others = [entity_id for entity_id in targets if entity_id not in locked]
+    if locked:
+        await hass.services.async_call(
+            "lock", "unlock", {"entity_id": locked}, blocking=True
+        )
+    if others:
+        await hass.services.async_call(
+            "lock", "lock", {"entity_id": others}, blocking=True
+        )
+
+
+async def _call_targets(
+    hass: HomeAssistant, domain: str, service: str | None, targets: list[str]
+) -> None:
+    """Dispatch one wording bucket's action against its resolved targets.
+
+    `service` is the plain <domain>.<service> call for every domain
+    except lock's toggle bucket, which has no such single service (see
+    _toggle_locks and the SERVICE_BY_WORDING comment in const.py) and
+    is signalled here by `service` being None.
+    """
+    if service is not None:
+        await hass.services.async_call(
+            domain, service, {"entity_id": targets}, blocking=True
+        )
+        return
+    if domain == TARGET_DOMAIN_LOCK:
+        await _toggle_locks(hass, targets)
+        return
+    # No other domain currently has a None service entry - this would
+    # only be reached by a future SERVICE_BY_WORDING gap that also needs
+    # its own per-entity handling added here.
+    raise ValueError(f"No service configured for domain '{domain}'")
+
+
 def async_register_rule(hass: HomeAssistant, entry) -> list[CALLBACK_TYPE]:
     """Register one sentence trigger per non-empty wording bucket on this rule."""
     data: dict[str, Any] = entry.options if entry.options else entry.data
@@ -129,20 +182,23 @@ def async_register_rule(hass: HomeAssistant, entry) -> list[CALLBACK_TYPE]:
     not_found_response = data.get(CONF_RESPONSE_NOT_FOUND) or None
     unknown_room_response = data.get(CONF_RESPONSE_UNKNOWN_ROOM) or DEFAULT_UNKNOWN_ROOM_RESPONSE
     error_response = data.get(CONF_RESPONSE_ERROR) or None
+    domain_services = SERVICE_BY_WORDING.get(domain, {})
 
     agent_manager = get_agent_manager(hass)
     ent_reg = er.async_get(hass)
     unsubs: list[CALLBACK_TYPE] = []
 
-    for wording_key, service in SERVICE_BY_WORDING.items():
+    for wording_key in WORDING_KEYS:
         sentences = wordings.get(wording_key) or []
         if not sentences:
             continue
+        service = domain_services.get(wording_key)
 
         async def call_action(
             user_input: ConversationInput,
             result: Any,
-            _service: str = service,
+            _service: str | None = service,
+            _wording_key: str = wording_key,
         ) -> str | None:
             """Resolve this rule's targets for whoever just said it, and act."""
             device_id = user_input.device_id
@@ -174,19 +230,17 @@ def async_register_rule(hass: HomeAssistant, entry) -> list[CALLBACK_TYPE]:
                     entry.title,
                     user_input.text,
                     domain,
-                    _service,
+                    _service or _wording_key,
                 )
                 return not_found_response
 
             try:
-                await hass.services.async_call(
-                    domain, _service, {"entity_id": targets}, blocking=True
-                )
+                await _call_targets(hass, domain, _service, targets)
             except Exception:
                 _LOGGER.exception(
                     "Phrase Router: '%s' failed to %s %s",
                     entry.title,
-                    _service,
+                    _service or _wording_key,
                     targets,
                 )
                 if error_response:

@@ -37,14 +37,19 @@ CONF_RESPONSES_SECTION = "more_responses"
 # has always used.
 DEFAULT_UNKNOWN_ROOM_RESPONSE = "I'm not sure which room that was."
 
-# Domains a rule can target - all three expose the same turn_on/turn_off/
-# toggle services, so SERVICE_BY_WORDING below needs no per-domain
-# mapping. Only add a domain here once its services line up the same
-# way, or SERVICE_BY_WORDING needs its own per-domain table too.
+# Domains a rule can target.
 TARGET_DOMAIN_LIGHT = "light"
 TARGET_DOMAIN_FAN = "fan"
 TARGET_DOMAIN_SWITCH = "switch"
-TARGET_DOMAINS = (TARGET_DOMAIN_LIGHT, TARGET_DOMAIN_FAN, TARGET_DOMAIN_SWITCH)
+TARGET_DOMAIN_COVER = "cover"
+TARGET_DOMAIN_LOCK = "lock"
+TARGET_DOMAINS = (
+    TARGET_DOMAIN_LIGHT,
+    TARGET_DOMAIN_FAN,
+    TARGET_DOMAIN_SWITCH,
+    TARGET_DOMAIN_COVER,
+    TARGET_DOMAIN_LOCK,
+)
 
 # Entries built before the domain field existed have nothing stored under
 # CONF_DOMAIN - they were light-only rules, so this is what they fall
@@ -57,6 +62,8 @@ TARGET_DOMAIN_NAMES = {
     TARGET_DOMAIN_LIGHT: "Lights",
     TARGET_DOMAIN_FAN: "Fans",
     TARGET_DOMAIN_SWITCH: "Switches",
+    TARGET_DOMAIN_COVER: "Covers",
+    TARGET_DOMAIN_LOCK: "Locks",
 }
 
 AREA_SCOPE_DEVICE = "device"
@@ -69,14 +76,53 @@ WORDING_TURN_ON = "turn_on"
 WORDING_TURN_OFF = "turn_off"
 WORDING_KEYS = (WORDING_TOGGLE, WORDING_TURN_ON, WORDING_TURN_OFF)
 
-# Which <domain>.* service each wording bucket calls - the same three
-# verbs on light, fan and switch, so this table is shared across all of
-# them.
-SERVICE_BY_WORDING = {
+# Which <domain>.* service each wording bucket calls.
+#
+# Light/fan/switch expose identical turn_on/turn_off/toggle services, so
+# one shared table (_ON_OFF_TOGGLE) covers all three.
+#
+# Cover doesn't use turn_on/turn_off at all (it's open_cover/close_cover)
+# but does have a native toggle service, so "on" is treated as open and
+# "off" as closed.
+#
+# Lock has no turn_on/turn_off/toggle services whatsoever - only
+# lock.lock, lock.unlock and lock.open. "On" is treated as the unlocked
+# (more permissive/active) state and "off" as locked, same reasoning as
+# cover's open/closed. There's deliberately no WORDING_TOGGLE entry for
+# lock: a missing key here is triggers.py's signal to fall back to its
+# own per-entity, state-based lock/unlock handling (see
+# _toggle_locks in triggers.py) instead of calling one service for every
+# target at once - unlike a light or switch, there's no single
+# "lock.toggle" service that could receive a mixed-state target list.
+_ON_OFF_TOGGLE = {
     WORDING_TOGGLE: "toggle",
     WORDING_TURN_ON: "turn_on",
     WORDING_TURN_OFF: "turn_off",
 }
+
+SERVICE_BY_WORDING = {
+    TARGET_DOMAIN_LIGHT: _ON_OFF_TOGGLE,
+    TARGET_DOMAIN_FAN: _ON_OFF_TOGGLE,
+    TARGET_DOMAIN_SWITCH: _ON_OFF_TOGGLE,
+    TARGET_DOMAIN_COVER: {
+        WORDING_TOGGLE: "toggle",
+        WORDING_TURN_ON: "open_cover",
+        WORDING_TURN_OFF: "close_cover",
+    },
+    TARGET_DOMAIN_LOCK: {
+        WORDING_TURN_ON: "unlock",
+        WORDING_TURN_OFF: "lock",
+    },
+}
+
+# Domains whose toggle wording is optional rather than required. Lock is
+# the only one so far - it has no native toggle service (see above), and
+# a per-entity lock/unlock-by-state toggle isn't always a phrase worth
+# wiring up, so a lock rule can rely on the explicit unlock/lock
+# wordings alone. At least one of toggle/on/off is still required so a
+# rule can't be saved with no phrases at all - see _parse_wordings /
+# _parse_settings in config_flow.py.
+TOGGLE_OPTIONAL_DOMAINS = frozenset({TARGET_DOMAIN_LOCK})
 
 # No entity platforms - a rule is a device with no entities, just a
 # registered sentence trigger. See triggers.py.

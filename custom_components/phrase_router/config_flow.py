@@ -77,6 +77,7 @@ from .const import (
     DEFAULT_TARGET_DOMAIN,
     DOMAIN,
     TARGET_DOMAIN_NAMES,
+    TOGGLE_OPTIONAL_DOMAINS,
     WORDING_TOGGLE,
     WORDING_TURN_OFF,
     WORDING_TURN_ON,
@@ -147,19 +148,25 @@ def _suggested_name(
 def _wordings_schema(
     current: dict[str, list[str]],
     current_responses: dict[str, str | None] | None = None,
+    domain: str = DEFAULT_TARGET_DOMAIN,
 ) -> vol.Schema:
-    # Every field below except the required toggle uses
-    # description={"suggested_value": ...} rather than default=... on
-    # purpose - see the module docstring for why that distinction
-    # matters (it's what lets a previously-set value be cleared back to
-    # blank on the Configure side; harmless here where everything
-    # starts blank anyway).
+    # Every field below except the toggle wording (when required - see
+    # TOGGLE_OPTIONAL_DOMAINS) uses description={"suggested_value": ...}
+    # rather than default=... on purpose - see the module docstring for
+    # why that distinction matters (it's what lets a previously-set
+    # value be cleared back to blank on the Configure side; harmless
+    # here where everything starts blank anyway).
     current_responses = current_responses or {}
+    toggle_default = _join_phrases(current.get(WORDING_TOGGLE))
+    if domain in TOGGLE_OPTIONAL_DOMAINS:
+        toggle_field = vol.Optional(
+            WORDING_TOGGLE, description={"suggested_value": toggle_default}
+        )
+    else:
+        toggle_field = vol.Required(WORDING_TOGGLE, default=toggle_default)
     return vol.Schema(
         {
-            vol.Required(
-                WORDING_TOGGLE, default=_join_phrases(current.get(WORDING_TOGGLE))
-            ): str,
+            toggle_field: str,
             vol.Optional(
                 WORDING_TURN_ON,
                 description={
@@ -214,17 +221,25 @@ def _wordings_schema(
     )
 
 
-def _parse_wordings(user_input: dict[str, Any]) -> tuple[dict[str, list[str]], dict[str, str]]:
+def _parse_wordings(
+    user_input: dict[str, Any], domain: str
+) -> tuple[dict[str, list[str]], dict[str, str]]:
     errors: dict[str, str] = {}
     toggle = _split_phrases(user_input.get(WORDING_TOGGLE))
-    if not toggle:
+    turn_on = _split_phrases(user_input.get(WORDING_TURN_ON))
+    turn_off = _split_phrases(user_input.get(WORDING_TURN_OFF))
+    if domain in TOGGLE_OPTIONAL_DOMAINS:
+        if not toggle and not turn_on and not turn_off:
+            errors[WORDING_TOGGLE] = "wording_required"
+    elif not toggle:
         errors[WORDING_TOGGLE] = "toggle_required"
+    if errors:
         return {}, errors
     return (
         {
             WORDING_TOGGLE: toggle,
-            WORDING_TURN_ON: _split_phrases(user_input.get(WORDING_TURN_ON)),
-            WORDING_TURN_OFF: _split_phrases(user_input.get(WORDING_TURN_OFF)),
+            WORDING_TURN_ON: turn_on,
+            WORDING_TURN_OFF: turn_off,
         },
         errors,
     )
@@ -307,9 +322,11 @@ class PhraseRouterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_wordings(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """The phrases: required toggle, optional explicit on/off, optional responses."""
+        """The phrases: toggle (required unless the domain makes it optional),
+        optional explicit on/off, optional responses."""
+        domain = self._data.get(CONF_DOMAIN, DEFAULT_TARGET_DOMAIN)
         if user_input is not None:
-            wordings, errors = _parse_wordings(user_input)
+            wordings, errors = _parse_wordings(user_input, domain)
             if not errors:
                 self._data[CONF_WORDINGS] = wordings
                 _store_responses(self._data, user_input)
@@ -318,7 +335,9 @@ class PhraseRouterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors = {}
 
         return self.async_show_form(
-            step_id="wordings", data_schema=_wordings_schema({}), errors=errors
+            step_id="wordings",
+            data_schema=_wordings_schema({}, domain=domain),
+            errors=errors,
         )
 
     async def async_step_name(
@@ -350,6 +369,18 @@ class PhraseRouterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 # Configure / options flow (PhraseRouterOptionsFlow) - one page of
 # expandable sections, pre-filled from the existing rule.
 # --------------------------------------------------------------------
+
+
+def _phrases_toggle_field(domain: str, wordings: dict[str, list[str]]):
+    """The Configure page's toggle field: Required for most domains,
+    Optional when the domain is in TOGGLE_OPTIONAL_DOMAINS (currently
+    just lock - see const.py)."""
+    toggle_value = _join_phrases(wordings.get(WORDING_TOGGLE))
+    if domain in TOGGLE_OPTIONAL_DOMAINS:
+        return vol.Optional(
+            WORDING_TOGGLE, description={"suggested_value": toggle_value}
+        )
+    return vol.Required(WORDING_TOGGLE, default=toggle_value)
 
 
 def _settings_schema(current: dict[str, Any]) -> vol.Schema:
@@ -418,10 +449,7 @@ def _settings_schema(current: dict[str, Any]) -> vol.Schema:
             vol.Required(CONF_PHRASES_SECTION): section(
                 vol.Schema(
                     {
-                        vol.Required(
-                            WORDING_TOGGLE,
-                            default=_join_phrases(wordings.get(WORDING_TOGGLE)),
-                        ): str,
+                        _phrases_toggle_field(current_domain, wordings): str,
                         vol.Optional(
                             WORDING_TURN_ON,
                             description={
@@ -501,6 +529,7 @@ def _parse_settings(user_input: dict[str, Any]) -> tuple[dict[str, Any], dict[st
     phrases = user_input.get(CONF_PHRASES_SECTION) or {}
     more_responses = user_input.get(CONF_RESPONSES_SECTION) or {}
 
+    domain = targeting.get(CONF_DOMAIN, DEFAULT_TARGET_DOMAIN)
     area_scope = area.get(CONF_AREA_SCOPE) or AREA_SCOPE_DEVICE
     fixed_area = fixed_area_section.get(CONF_FIXED_AREA)
     if area_scope == AREA_SCOPE_FIXED and not fixed_area:
@@ -509,11 +538,16 @@ def _parse_settings(user_input: dict[str, Any]) -> tuple[dict[str, Any], dict[st
         ] = "fixed_area_required"
 
     toggle = _split_phrases(phrases.get(WORDING_TOGGLE))
-    if not toggle:
+    turn_on = _split_phrases(phrases.get(WORDING_TURN_ON))
+    turn_off = _split_phrases(phrases.get(WORDING_TURN_OFF))
+    if domain in TOGGLE_OPTIONAL_DOMAINS:
+        if not toggle and not turn_on and not turn_off:
+            errors[f"{CONF_PHRASES_SECTION}.{WORDING_TOGGLE}"] = "wording_required"
+    elif not toggle:
         errors[f"{CONF_PHRASES_SECTION}.{WORDING_TOGGLE}"] = "toggle_required"
 
     data: dict[str, Any] = {
-        CONF_DOMAIN: targeting.get(CONF_DOMAIN, DEFAULT_TARGET_DOMAIN),
+        CONF_DOMAIN: domain,
         CONF_LABEL_ID: targeting.get(CONF_LABEL_ID),
         CONF_AREA_SCOPE: area_scope,
         # Only kept when it's actually meaningful, same as the wizard's
@@ -521,8 +555,8 @@ def _parse_settings(user_input: dict[str, Any]) -> tuple[dict[str, Any], dict[st
         CONF_FIXED_AREA: fixed_area if area_scope == AREA_SCOPE_FIXED else None,
         CONF_WORDINGS: {
             WORDING_TOGGLE: toggle,
-            WORDING_TURN_ON: _split_phrases(phrases.get(WORDING_TURN_ON)),
-            WORDING_TURN_OFF: _split_phrases(phrases.get(WORDING_TURN_OFF)),
+            WORDING_TURN_ON: turn_on,
+            WORDING_TURN_OFF: turn_off,
         },
         CONF_RESPONSE: phrases.get(CONF_RESPONSE) or None,
         CONF_RESPONSE_ERROR: phrases.get(CONF_RESPONSE_ERROR) or None,
