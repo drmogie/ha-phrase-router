@@ -1,3 +1,9 @@
+## 2026.09.21.02 - Fix startup crash from 2026.09.21.01
+
+- 2026.09.21.01 imported `STATE_LOCKED` from `homeassistant.const`, which does not exist on this HA version and made the integration fail to load entirely - **existing light/switch/fan rules stopped working too**, not just the new lock rule.
+- Fixed by comparing against the literal `"locked"` state string instead of the missing constant (the state string itself is stable across HA versions).
+- No behavior change from what 2026.09.21.01 intended - lock toggle logic works exactly as documented there.
+
 ## 2026.09.21.01 - Cover and lock domains
 
 - Rules can now target **cover** or **lock** entities, alongside light/fan/switch.

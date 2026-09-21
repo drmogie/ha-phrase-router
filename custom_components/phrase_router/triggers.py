@@ -38,7 +38,6 @@ from typing import Any
 
 from homeassistant.components.conversation.agent_manager import get_agent_manager
 from homeassistant.components.conversation.models import ConversationInput
-from homeassistant.const import STATE_LOCKED
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
@@ -133,7 +132,7 @@ async def _toggle_locks(hass: HomeAssistant, targets: list[str]) -> None:
         entity_id
         for entity_id in targets
         if (state := hass.states.get(entity_id)) is not None
-        and state.state == STATE_LOCKED
+        and state.state == "locked"  # lock state string is stable across HA versions; STATE_LOCKED const is not
     ]
     others = [entity_id for entity_id in targets if entity_id not in locked]
     if locked:
